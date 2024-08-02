@@ -75,21 +75,25 @@ struct aligned_allocator
 
 // dataPrepare是用來初始化test case data的地方，輸入為指標(array)
 void dataPrepare(float *Array, int Nb_Of_Elements){
-  ifstream infile("/users/student/mr112/stsung23/flattened_data.txt");
-  if(!infile) {
-	  cerr << "Error opening file." << endl;
-	  return;
-  }
+    ifstream infile("/home/stsung23/flattened_data.txt");
+    // ifstream infile("/home/stsung23/b.txt");
+	if(!infile) {
+        cerr << "Error opening file." << endl;
+        return;
+    }
 
-  string line;
-  getline(infile, line);
-  stringstream ss(line);
-  float value;
-  int i = 0;
-  while(ss >> value && i < Nb_Of_Elements) {
-	  Array[i++] = value;
-  }
-  infile.close();
+    string line;
+    float value;
+    int i = 0;
+    while(getline(infile, line, ',') && i < Nb_Of_Elements) {
+        value = stof(line);
+        Array[i++] = value;
+    }
+    infile.close();
+
+    if(i < Nb_Of_Elements) {
+        cerr << "Warning: Not enough data in the file. Only " << i << " elements read." << endl;
+    }
 }
 
 void run_custom_profiling (int Nb_Of_Kernels, int Nb_Of_Memory_Tranfers, cl_event* K_exe_event, cl_event* Mem_op_event,string* list_of_kernel_names) {

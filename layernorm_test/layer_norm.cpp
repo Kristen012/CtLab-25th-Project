@@ -125,43 +125,49 @@ static void compute_norm(hls::stream<float>& in1_stream,
 
 
 execute_norm:
-    for(int i = 0; i < BATCH_SIZE; i++) {
+    for(int i = 0; i < HEIGHT; i++) {
         float mean = 0;
         float variance = 0;
-        int size = HEIGHT * WIDTH;
+        int roll = 4;
 
         // Read input and compute mean
-        float temp_input[512][768];
-        compute_norm_mean:
-        for(int j = 0; j < HEIGHT; j++) {
+        float temp_input[768];
+
+
+        load_temp_input:
+        for(int j = 0; j < WIDTH; j++) {
 #pragma HLS PIPELINE II=1
-            for(int k = 0; k < WIDTH; k++) {
                 float val = in1_stream.read();
-                temp_input[j][k] = val;
-                mean = mean + val;
-            }
+                temp_input[j] = val;
         }
-        mean = mean / size;
+
+        compute_norm_mean:
+		for(int j = 0; j < WIDTH; j+=roll) {
+#pragma HLS PIPELINE II=1
+			mean += temp_input[j] + temp_input[j + 1] + temp_input[j + 2] + temp_input[j + 3];
+		}
+        mean /= WIDTH;
 
         // Compute variance
-        compute_norm_variance:
-        for(int j = 0; j < HEIGHT; j++) {
+        compute_temp_diff:
+        for(int j = 0; j < WIDTH; j++) {
 #pragma HLS PIPELINE II=1
-            for(int k = 0; k < WIDTH; k++) {
-                float diff = temp_input[j][k] - mean;
-                variance = variance + diff * diff;
-            }
+			temp_input[j] = temp_input[j] - mean;
         }
-        variance = variance / size;
+
+        compute_norm_variance:
+		for(int j = 0; j < WIDTH; j+=roll) {
+#pragma HLS PIPELINE II=1
+			variance += temp_input[j] * temp_input[j] + temp_input[j+1] * temp_input[j+1] + temp_input[j+2] * temp_input[j+2] + temp_input[j+3] * temp_input[j+3];
+		}
+        variance /= WIDTH;
 
         // Normalize
         compute_norm_normalize:
-        for(int j = 0; j < HEIGHT; j++) {
+        for(int j = 0; j < WIDTH; j++) {
 #pragma HLS PIPELINE II=1
-            for(int k = 0; k < WIDTH; k++) {
-                float norm = (temp_input[j][k] - mean) / sqrt(variance);
-                out_stream << norm;
-            }
+			float norm = (temp_input[j]) / hls::sqrt(variance + 0.00001);
+			out_stream << norm;
         }
     }
 }
