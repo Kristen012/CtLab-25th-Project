@@ -96,6 +96,18 @@ void dataPrepare(float *Array, int Nb_Of_Elements){
     }
 }
 
+void GdataPrepare(float *Array, int Nb_Of_Elements){
+	for(int i = 0; i < Nb_Of_Elements; i++) {
+		Array[i] = 1;
+	}
+}
+
+void BdataPrepare(float *Array, int Nb_Of_Elements){
+	for(int i = 0; i < Nb_Of_Elements; i++) {
+		Array[i] = 0;
+	}
+}
+
 void run_custom_profiling (int Nb_Of_Kernels, int Nb_Of_Memory_Tranfers, cl_event* K_exe_event, cl_event* Mem_op_event,string* list_of_kernel_names) {
 	typedef struct {
 		string    action_type; // kernel, "memory (H->G)", "memory (G->H)"

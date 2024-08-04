@@ -121,8 +121,21 @@ static void compute_norm(hls::stream<float>& in1_stream,
                          hls::stream<float>& out_stream,
                          int BATCH_SIZE,
                          int HEIGHT,
-                         int WIDTH) {
+                         int WIDTH,
+                         hls::stream<float>& g_stream,
+                         hls::stream<float>& b_stream) {
 
+	float G[768];
+	float B[768];
+
+stream_to_array:
+	for(int i = 0; i < WIDTH; i++) {
+#pragma HLS PIPELINE II=1
+		float g_val = g_stream.read();
+		G[i] = g_val;
+		float b_val = b_stream.read();
+		B[i] = b_val;
+	}
 
 execute_norm:
     for(int i = 0; i < HEIGHT; i++) {
@@ -132,7 +145,6 @@ execute_norm:
 
         // Read input and compute mean
         float temp_input[768];
-
 
         load_temp_input:
         for(int j = 0; j < WIDTH; j++) {
@@ -166,7 +178,7 @@ execute_norm:
         compute_norm_normalize:
         for(int j = 0; j < WIDTH; j++) {
 #pragma HLS PIPELINE II=1
-			float norm = (temp_input[j]) / hls::sqrt(variance + 0.00001);
+			float norm = (temp_input[j]) / hls::sqrt(variance + 0.00001) * G[j] + B[j];
 			out_stream << norm;
         }
     }
@@ -198,7 +210,7 @@ extern "C" {
 |  WIDTH = 768     |
 */
 
-void layer_norm(float* in1, float* out, int BATCH_SIZE, int HEIGHT, int WIDTH) {
+void layer_norm(float* in1, float* out, float* g, float* b, int BATCH_SIZE, int HEIGHT, int WIDTH) {
 #pragma HLS INTERFACE m_axi port=in1 offset=slave bundle=gmem0 depth=4096 max_read_burst_length=256 num_read_outstanding=16 num_write_outstanding=16 max_write_burst_length=256
 #pragma HLS INTERFACE m_axi port=out offset=slave bundle=gmem1 depth=4096 max_read_burst_length=256 num_read_outstanding=16 num_write_outstanding=16 max_write_burst_length=256
 #pragma HLS INTERFACE s_axilite port=in1 bundle=control
@@ -208,20 +220,31 @@ void layer_norm(float* in1, float* out, int BATCH_SIZE, int HEIGHT, int WIDTH) {
 #pragma HLS INTERFACE s_axilite port=WIDTH bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
+#pragma HLS INTERFACE m_axi port=g offset=slave bundle=gmem2 depth=4096 max_read_burst_length=256 num_read_outstanding=16 num_write_outstanding=16 max_write_burst_length=256
+#pragma HLS INTERFACE m_axi port=b offset=slave bundle=gmem3 depth=4096 max_read_burst_length=256 num_read_outstanding=16 num_write_outstanding=16 max_write_burst_length=256
+#pragma HLS INTERFACE s_axilite port=g bundle=control
+#pragma HLS INTERFACE s_axilite port=b bundle=control
+
 	static hls::stream<float> in1_stream("input_stream_1");
 	static hls::stream<float> out_stream("output_stream");
+	static hls::stream<float> g_stream("g_stream");
+	static hls::stream<float> b_stream("b_stream");
 
 //#pragma HLS STREAM variable=in1_stream depth=393216
 //#pragma HLS STREAM variable=out_stream depth=393216
 
 #pragma HLS STREAM variable=in1_stream depth=4096
 #pragma HLS STREAM variable=out_stream depth=4096
+#pragma HLS STREAM variable=g_stream depth=768
+#pragma HLS STREAM variable=b_stream depth=768
 
     int size = BATCH_SIZE * HEIGHT * WIDTH;
 
 #pragma HLS dataflow
     load_input(in1, in1_stream, size);
-    compute_norm(in1_stream, out_stream, BATCH_SIZE, HEIGHT, WIDTH);
+    load_input(g, g_stream, WIDTH);
+    load_input(b, b_stream, WIDTH);
+    compute_norm(in1_stream, out_stream, BATCH_SIZE, HEIGHT, WIDTH, g_stream, b_stream);
     store_result(out, out_stream, size);
 
 }

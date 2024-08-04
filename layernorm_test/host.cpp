@@ -61,6 +61,7 @@ static const int DATA_SIZE = DATA_BATCH_SIZE * DATA_HEIGHT * DATA_WIDTH;
 
 // Compute the size of array in bytes
 size_t size_in_bytes = DATA_SIZE * sizeof(int);
+size_t size_in_bytes_GandB = DATA_WIDTH * sizeof(int);
 
 static const string error_message =
     "Error: Result mismatch:\n"
@@ -289,10 +290,14 @@ int main(int argc, char* argv[]) {
 	// ------------------------------------------------------------------
     /* 此處可以定義input和output的型別 */
     float* ptr_DataIn_1;
+    float* ptr_DataIn_2;
+    float* ptr_DataIn_3;
     float* ptr_result;
     // These commands will allocate memory on the .Device 
     // The cl::Buffer objects can be used to reference the memory locations on the device.
     /* 以下區域為input data傳入host的code，只需要複製並且更改參數和型別即可(size_in_bytes(考慮input大小(byte)), ptr_DataIn_1, DATA_SIZE(考慮input大小))*/
+
+    // Data input 1 Begin
     #ifdef ALL_MESSAGES
     cout << "HOST-Info: Allocating Memory buffer_DataIn_1 for DataIn_1 ... " << endl;
     #endif
@@ -310,6 +315,47 @@ int main(int argc, char* argv[]) {
     #ifdef ALL_MESSAGES
     cout << "           Generated " << DATA_SIZE << " values" << endl;
     #endif
+    // Data input 1 End
+
+    // Data input 2 Begin
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Allocating Memory buffer_DataIn_2 for DataIn_2 ... " << endl;
+    #endif
+    OCL_CHECK(err, cl::Buffer buffer_DataIn_2(context, CL_MEM_READ_ONLY, size_in_bytes_GandB, NULL, &err));
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Mapping buffer_DataIn_2 to ptr_DataIn_2 ... " << endl;
+    #endif
+    OCL_CHECK(err,
+              ptr_DataIn_2 = (float*)q.enqueueMapBuffer(buffer_DataIn_2, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes_GandB, NULL, NULL, &err));
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Generating buffer_DataIn_2 ..." << endl;
+    #endif
+    // Call dataPrepare to init data
+    GdataPrepare(ptr_DataIn_2, DATA_WIDTH);
+    #ifdef ALL_MESSAGES
+    cout << "           Generated " << DATA_WIDTH << " values" << endl;
+    #endif
+    // Data input 2 End
+
+    // Data input 3 Begin
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Allocating Memory buffer_DataIn_3 for DataIn_3 ... " << endl;
+    #endif
+    OCL_CHECK(err, cl::Buffer buffer_DataIn_3(context, CL_MEM_READ_ONLY, size_in_bytes_GandB, NULL, &err));
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Mapping buffer_DataIn_3 to ptr_DataIn_3 ... " << endl;
+    #endif
+    OCL_CHECK(err,
+              ptr_DataIn_3 = (float*)q.enqueueMapBuffer(buffer_DataIn_3, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes_GandB, NULL, NULL, &err));
+    #ifdef ALL_MESSAGES
+    cout << "HOST-Info: Generating buffer_DataIn_3 ..." << endl;
+    #endif
+    // Call dataPrepare to init data
+    BdataPrepare(ptr_DataIn_3, DATA_WIDTH);
+    #ifdef ALL_MESSAGES
+    cout << "           Generated " << DATA_WIDTH << " values" << endl;
+    #endif
+    // Data input 3 End
 
     // Init output data buffer
     #ifdef ALL_MESSAGES
@@ -323,7 +369,7 @@ int main(int argc, char* argv[]) {
 
     // Data will be migrated to kernel space
     // 考慮input量，若有多份則要改成{buffer_DataIn1, buffer_DataIn2...}
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_DataIn_1}, 0 /* 0 means from host*/));
+    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_DataIn_1, buffer_DataIn_2, buffer_DataIn_3}, 0 /* 0 means from host*/));
     
     // ============================================================================
 	// Step 5: Set Kernel Arguments and Run the Application
@@ -356,9 +402,12 @@ int main(int argc, char* argv[]) {
     int narg = 0;
     OCL_CHECK(err, err = layer_norm.setArg(narg++, buffer_DataIn_1));
     OCL_CHECK(err, err = layer_norm.setArg(narg++, buffer_result));
+    OCL_CHECK(err, err = layer_norm.setArg(narg++, buffer_DataIn_2));
+    OCL_CHECK(err, err = layer_norm.setArg(narg++, buffer_DataIn_3));
     OCL_CHECK(err, err = layer_norm.setArg(narg++, DATA_BATCH_SIZE));
     OCL_CHECK(err, err = layer_norm.setArg(narg++, DATA_HEIGHT));
     OCL_CHECK(err, err = layer_norm.setArg(narg++, DATA_WIDTH));
+
     
     // ----------------------------------------
 	// Step 5.2: Submit Kernels for Execution
@@ -390,12 +439,25 @@ int main(int argc, char* argv[]) {
 	// ------------------------------------------------------
     /* 此處為error detection，可以選擇直接印出來*/
     bool error_detected = false;
+    float cal_kernel = 0;
+    float cal_host = 0;
+    int cnt = 0;
     for (int i = 0; i < DATA_SIZE; i++) {
         float host_result = ptr_DataIn_1[i];
 //    	float host_result = ptr_DataIn_1[i] * 0.5 * (1 + tanh(0.7978845608 * (ptr_DataIn_1[i] + 0.044715 * pow(ptr_DataIn_1[i], 3))));
 //    	float host_result = ptr_DataIn_1[i] * 0.5 + 0.08;
+        cal_kernel += ptr_result[i];
+        cal_host += host_result;
+        cnt++;
     	if(1) {
     		cout << i << " host: " << host_result << "   kernel: " << ptr_result[i] << endl;
+            if(cnt == DATA_WIDTH) {
+                cnt = 0;
+                cout << "=========== Avg of original row: " << cal_host / DATA_WIDTH << " ===========" << endl;
+                cout << "=========== Avg of normalized row(should be 0): " << cal_kernel << " ===========" << endl;
+                cal_host = 0;
+                cal_kernel = 0;
+            }
             continue;
     	}
         if (ptr_result[i] != host_result) {
@@ -424,6 +486,8 @@ int main(int argc, char* argv[]) {
 	// ============================================================================
     // 同樣需要注意data數量及argument名稱
     OCL_CHECK(err, err = q.enqueueUnmapMemObject(buffer_DataIn_1, ptr_DataIn_1));
+    OCL_CHECK(err, err = q.enqueueUnmapMemObject(buffer_DataIn_2, ptr_DataIn_2));
+    OCL_CHECK(err, err = q.enqueueUnmapMemObject(buffer_DataIn_3, ptr_DataIn_3));
     OCL_CHECK(err, err = q.enqueueUnmapMemObject(buffer_result, ptr_result));
     OCL_CHECK(err, err = q.finish());
     
