@@ -39,6 +39,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <vector>
 #include <math.h>
+#include <cmath>
 #include "host.hpp"
 
 #define OCL_CHECK(error, call)                                                                   \
@@ -51,11 +52,14 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace std;
 
 // 可以在這裡塞一點需要用到的常數
-static const int DATA_SIZE_X = 48; // TODO
-static const int DATA_SIZE_WEIGHT = 12; // TODO
-static const int DATA_SIZE_BIAS = 2; // TODO
-static const int DATA_SIZE_RES = 16; // TODO
-
+//static const int DATA_SIZE_X = 98304; // TODO
+//static const int DATA_SIZE_WEIGHT = 147456; // TODO
+//static const int DATA_SIZE_BIAS = 384; // TODO
+//static const int DATA_SIZE_RES = 98304; // TODO
+static const int DATA_SIZE_X = 393216; // TODO
+static const int DATA_SIZE_WEIGHT = 589824; // TODO
+static const int DATA_SIZE_BIAS = 768; // TODO
+static const int DATA_SIZE_RES = 393216; // TODO
 
 // Compute the size of array in bytes
 size_t size_in_bytes_x = DATA_SIZE_X * sizeof(float);
@@ -312,7 +316,7 @@ int main(int argc, char* argv[]) {
     cout << "HOST-Info: Generating buffer_DataIn_1 ..." << endl;
     #endif
     // Call dataPrepare to init data
-    dataPrepare(ptr_DataIn_1, DATA_SIZE_X);
+    dataPrepare(ptr_DataIn_1, DATA_SIZE_X, 1);
     #ifdef ALL_MESSAGES
     cout << "           Generated " << DATA_SIZE_X << " values" << endl;
     #endif
@@ -331,7 +335,7 @@ int main(int argc, char* argv[]) {
     cout << "HOST-Info: Generating buffer_DataIn_2 ..." << endl;
     #endif
     // Call dataPrepare to init data
-    dataPrepare(ptr_DataIn_2, DATA_SIZE_WEIGHT);
+    dataPrepare(ptr_DataIn_2, DATA_SIZE_WEIGHT, 2);
     #ifdef ALL_MESSAGES
     cout << "           Generated " << DATA_SIZE_WEIGHT << " values" << endl;
     #endif
@@ -350,7 +354,7 @@ int main(int argc, char* argv[]) {
     cout << "HOST-Info: Generating buffer_DataIn_3 ..." << endl;
     #endif
     // Call dataPrepare to init data
-    dataPrepare(ptr_DataIn_3, DATA_SIZE_BIAS);
+    dataPrepare(ptr_DataIn_3, DATA_SIZE_BIAS, 3);
     #ifdef ALL_MESSAGES
     cout << "           Generated " << DATA_SIZE_BIAS << " values" << endl;
     #endif
@@ -435,14 +439,19 @@ int main(int argc, char* argv[]) {
 	// ------------------------------------------------------
     /* 此處為error detection，可以選擇直接印出來*/
     bool error_detected = false;
+    float host_result[DATA_SIZE_RES];
+    dataPrepare(host_result, DATA_SIZE_RES, 4);
     for (int i = 0; i < DATA_SIZE_RES; i++) {
-    	  cout << ptr_result[i] << endl;
+//    	cout << host_result[i] << " " << ptr_result[i] << endl;
+    	//   cout << ptr_result[i] << " ";
+        //   if(i%10 == 0) cout << endl;
 //        cout << host_result << " " << ptr_result[i] << endl;
-//        if (ptr_result[i] != host_result) {
+       if (abs(ptr_result[i] - host_result[i]) > 0.005) {
+            cout << host_result[i] << " " << ptr_result[i] << endl;
 //            printf(error_message.c_str(), i, host_result, ptr_result[i]);
 //            error_detected = true;
 //            break;
-//        }
+       }
     }
     
     // ============================================================================

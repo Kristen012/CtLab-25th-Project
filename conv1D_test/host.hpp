@@ -52,7 +52,7 @@ ALL TIMES.
 
 #define BATCH_SIZE 1
 #define SEQ_LEN 2
-#define NUM_FEATURE 5 
+#define NUM_FEATURE 5
 
 #include <iostream>
 #include <CL/cl2.hpp>
@@ -77,11 +77,46 @@ struct aligned_allocator
 };
 
 // dataPrepare是用來初始化test case data的地方，輸入為指標(array)
-void dataPrepare(float *Array, int Nb_Of_Elements){
-   int val = -5;
-   for(int i=0;i<Nb_Of_Elements;i++){
-     Array[i] = val+0.2*i;
-   }
+// void dataPrepare(float *Array, int Nb_Of_Elements){
+//    int val = -5;
+//    for(int i=0;i<Nb_Of_Elements;i++){
+//      Array[i] = val+0.2*i;
+//    }
+// }
+void dataPrepare(float *Array, int Nb_Of_Elements, int flag) {
+    ifstream infile;
+    if (flag == 1) {
+        infile.open("/home/ywtang23/conv1D_test1/testing_data/testing_data/x_512768.txt");
+    } else if (flag == 2) {
+        infile.open("/home/ywtang23/conv1D_test1/testing_data/testing_data/weight_768768.txt");
+    } else if (flag == 3) {
+        infile.open("/home/ywtang23/conv1D_test1/testing_data/testing_data/bias_768.txt");
+    } else if (flag == 4) {
+        infile.open("/home/ywtang23/conv1D_test1/testing_data/testing_data/conv_res_512768.txt");
+	}
+	else {
+        cerr << "Invalid flag" << endl;
+        return;
+    }
+
+    if (!infile) {
+        cerr << "Error opening file." << endl;
+        return;
+    }
+
+    string line;
+    float value;
+    int i = 0;
+    while (getline(infile, line) && i < Nb_Of_Elements) {
+
+        value = stof(line);
+        Array[i++] = value;
+    }
+    infile.close();
+
+    if (i < Nb_Of_Elements) {
+        cerr << "Warning: Not enough data in the file. Only " << i << " elements read." << endl;
+    }
 }
 
 void run_custom_profiling (int Nb_Of_Kernels, int Nb_Of_Memory_Tranfers, cl_event* K_exe_event, cl_event* Mem_op_event,string* list_of_kernel_names) {
