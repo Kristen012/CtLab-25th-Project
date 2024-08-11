@@ -62,10 +62,14 @@ static void compute_matmul(hls::stream<float>& xStream,
      float b[b_max];
      float conv_result[o_max];
      float bias[NF];
+    //  float conv_tmp[NF];
+    //  float b_tmp[NF];
 #pragma HLS bind_storage variable=conv_result type=RAM_T2P impl=bram
 #pragma HLS bind_storage variable=a type=RAM_T2P impl=uram
 #pragma HLS bind_storage variable=b type=RAM_T2P impl=uram
 
+#pragma HLS ARRAY_RESHAPE variable=a type=cyclic factor=16
+#pragma HLS ARRAY_RESHAPE variable=b type=cyclic factor=16
 
      for (int i = 0; i < a_max; i++) {
  #pragma HLS PIPELINE II=1
@@ -86,22 +90,46 @@ static void compute_matmul(hls::stream<float>& xStream,
     for(int i = 0; i < DEPTH_HEIGHT; i++) {
         for(int j = 0; j < NF; j++) {
 #pragma HLS PIPELINE II=1
-        	conv_result[i * NF + j] = bias[j];;
+        	conv_result[i * NF + j] = bias[j];
         }
     }
 
-    for(int i = 0; i < DEPTH_HEIGHT; i++) {
-//    	for(int j = 0; j < NF; j++) {
-//#pragma HLS PIPELINE II=1
-//			conv_result[i * NF + j] = bias[j];
-//		}
-
+//     for(int i = 0; i < DEPTH_HEIGHT; i++) {
+//         int iNF = i * NF;
+//         for(int j = 0; j < NF; j++) {
+// #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL skip_exit_check factor=16
+//             conv_tmp[j] = bias[j];
+//         }
+//         for(int k = 0; k < NX; k++) {
+//             int kNF = k * NF;
+//             float aik = a[i * NX + k];
+//             for(int j = 0; j < NF; j++) {
+// #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL skip_exit_check factor=16
+//                 b_tmp[j] = b[kNF + j];
+//             }
+//             for(int j = 0; j < NF; j++) {
+// #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL skip_exit_check factor=16
+//             	conv_tmp[j] += aik * b_tmp[j];
+//             }
+//             for(int j = 0; j<NF; j++) {
+// #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL skip_exit_check factor=16
+//                 conv_result[iNF + j] = conv_tmp[j];
+//             }
+//         }
+//     }
+        for(int i = 0; i < DEPTH_HEIGHT; i++) {
+        int iNF = i * NF;
         for(int k = 0; k < NX; k++) {
+            int kNF = k * NF;
             float aik = a[i * NX + k];
             for(int j = 0; j < NF; j++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS UNROLL skip_exit_check factor=2
-            	conv_result[i * NF + j] += aik * b[k * NF + j];
+#pragma HLS UNROLL skip_exit_check factor=16
+            	conv_result[iNF + j] += aik * b[kNF + j];
             }
         }
     }

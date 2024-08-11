@@ -448,9 +448,9 @@ int main(int argc, char* argv[]) {
 //        cout << host_result << " " << ptr_result[i] << endl;
        if (abs(ptr_result[i] - host_result[i]) > 0.005) {
             cout << host_result[i] << " " << ptr_result[i] << endl;
-//            printf(error_message.c_str(), i, host_result, ptr_result[i]);
-//            error_detected = true;
-//            break;
+            printf(error_message.c_str(), i, host_result, ptr_result[i]);
+            error_detected = true;
+            break;
        }
     }
     
