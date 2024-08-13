@@ -1,0 +1,13 @@
+softmax_test/expected_softmax_16bit_fixed_point.txt
+softmax_test/expected_softmax_online_double.txt
+softmax_test/expected_softmax_online_float.txt
+softmax_test/expected_softmax_safe.txt
+softmax_test/expected_softmax.txt
+softmax_test/random_float.py
+softmax_test/random_floats_16bit_fixed_point.txt
+softmax_test/random_floats.txt
+softmax_test/softmax.cpp
+softmax_test/softmax.exe
+softmax_test/softmax_double.cpp
+softmax_test/softmax_double.exe
+softmax_test/softmax.py

@@ -72,10 +72,25 @@ struct aligned_allocator
 };
 
 void dataPrepare(float *Array, int Nb_Of_Elements){
-  int val = 1;
-  for(int i=0;i<Nb_Of_Elements;i++){
-    Array[i] = i;
-  }
+//  int val = 1;
+//  for(int i=0;i<Nb_Of_Elements;i++){
+//    Array[i] = i;
+//  }
+
+	std::string answerFilename = "/home/fyhsu23/softmax/softmax/src/random_floats.txt";
+		FILE* fp_ans;
+		if ((fp_ans = fopen(answerFilename.c_str(), "r")) == nullptr) {
+			printf("HOST-ERROR: %s not available please build\n", answerFilename.c_str());
+			exit(EXIT_FAILURE);
+		}
+	float value;
+	int i = 0;
+	while (fscanf(fp_ans, "%f", &value) != EOF) {
+		Array[i] = value;
+		i++;
+	//	  cout << "data_in " << i << ":" << value << endl;
+	}
+  	fclose(fp_ans);
 }
 
 void run_custom_profiling (int Nb_Of_Kernels, int Nb_Of_Memory_Tranfers, cl_event* K_exe_event, cl_event* Mem_op_event,string* list_of_kernel_names) {

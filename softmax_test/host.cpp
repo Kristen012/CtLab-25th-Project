@@ -50,13 +50,14 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-// static const int DIM = 512;
-// static const int DEP = 20;
-// static const int DATA_SIZE = DIM * DEP;
-static const int DATA_SIZE = 16;
+ static const int DIM = 1024;
+ static const int DEP = 768;
+ static const int DATA_SIZE = DIM * DEP;
+//static const int DATA_SIZE = 16;
 // Compute the size of array in bytes
 size_t size_in_bytes = DATA_SIZE * sizeof(float);
-size_t out_in_bytes = DIM * sizeof(float);
+//size_t out_in_bytes = DIM * sizeof(float);
+size_t out_in_bytes = DATA_SIZE * sizeof(float);
 
 static const string error_message =
     "Error: Result mismatch:\n"
@@ -375,7 +376,7 @@ int main(int argc, char* argv[]) {
     // ------------------------------------------------------
 	// Step 6.1: Check correctness of the output results
 	// ------------------------------------------------------
-    std::string answerFilename = "expected_softmax.txt";
+    std::string answerFilename = "/home/fyhsu23/softmax/softmax/src/expected_softmax.txt";
     FILE* fp_ans;
     if ((fp_ans = fopen(answerFilename.c_str(), "r")) == nullptr) {
         printf("HOST-ERROR: %s not available please build\n", answerFilename.c_str());
@@ -385,6 +386,7 @@ int main(int argc, char* argv[]) {
     float value;
     while (fscanf(fp_ans, "%f", &value) != EOF) {
         answers.push_back(value);
+//        cout << value << endl;
     }
     fclose(fp_ans);
     bool error_detected = false;
@@ -394,7 +396,7 @@ int main(int argc, char* argv[]) {
     // }
     for (int i = 0; i < DATA_SIZE; i++) {
         // float host_result = exp(ptr_DataIn_1[i]) / sum;
-        // cout << ptr_result[i] << endl;
+        // cout << i << "CPU result =" << answers[i] << " Device result =" << ptr_result[i] << "\n" << endl;
         // if (abs(ptr_result[i] - host_result) > 1e-6) {
         if (abs(ptr_result[i] - answers[i]) > 1e-6) {
             // printf(error_message.c_str(), i, host_result, ptr_result[i]);

@@ -84,18 +84,19 @@ Input Vector 2 from Global Memory --->|             |      |__|
 #include <hls_stream.h>
 #include <hls_math.h>
 
-// #define DIM 512
-// #define DEP 20
-// #define DATA_SIZE DIM*DEP
-#define DATA_SIZE 16
+#define DIM 1024
+//#define DIM 1
+#define DEP 768
+#define DATA_SIZE DIM*DEP
+// #define DATA_SIZE 16
 
 // TRIPCOUNT identifier
 const int c_size = DATA_SIZE;
 
 static void load_input(float* in, hls::stream<float>& inStream, int size) {
 mem_rd:
-    for (int i = 0; i < size; i++) {
-#pragma HLS LOOP_TRIPCOUNT min = c_size max = c_size
+    for (int i = 0; i < size * DEP; i++) {
+#pragma HLS pipeline II=1 style = frp
         inStream << in[i];
     }
 }
@@ -104,22 +105,32 @@ static void compute_softmax(hls::stream<float>& in,
                             hls::stream<float>& out_stream,
                             int size) {
 softmax_calculation:
-    float sum;
-    float buffer[DATA_SIZE];
-    for (int i = 0; i < DATA_SIZE; i++) {
-        float tmp = in.read();
-        sum += exp(tmp);
-        buffer[i] = tmp;
+    for (int j = 0; j < size; j++) {
+#pragma HLS dataflow
+    	float sum;
+		float buffer[DEP];
+#pragma HLS bind_storage variable=buffer type=ram_t2p
+    	sum = 0;
+		for (int i = 0; i < DEP; i++) {
+#pragma HLS pipeline II=1 style = frp
+			buffer[i] = in.read();
+			sum = sum + hls::exp(buffer[i]);
+		}
+//         for (int i = 0; i < DEP; i++) {
+// #pragma HLS pipeline II=1 style = frp
+// 			sum = sum + hls::exp(buffer[i]);
+// 		}
+		for (int i = 0; i < DEP; i++) {
+#pragma HLS pipeline II=1 style = frp
+			out_stream << (hls::exp(buffer[i]) / sum);
+		}
     }
-    for (int i = 0; i < DATA_SIZE; i++) {
-        out_stream << exp(buffer[i]) / sum;
-    }   
 }
 
 static void store_result(float* out, hls::stream<float>& out_stream, int size) {
 mem_wr:
-    for (int i = 0; i < size; i++) {
-#pragma HLS LOOP_TRIPCOUNT min = c_size max = c_size
+    for (int i = 0; i < size * DEP; i++) {
+#pragma HLS pipeline II=1 style = frp
         out[i] = out_stream.read();
     }
 }
@@ -134,16 +145,16 @@ extern "C" {
         size (input)  --> Number of elements in vector
 */
 void krnl_softmax(float* in1, float* out, int size) {
-#pragma HLS INTERFACE m_axi port = in1 bundle = gmem0
-#pragma HLS INTERFACE m_axi port = out bundle = gmem1
-
+#pragma HLS INTERFACE m_axi port = in1 bundle = gmem0 depth = 4096
+#pragma HLS INTERFACE m_axi port = out bundle = gmem1 depth = 4096
+    
     static hls::stream<float> in1_stream("input_stream_1");
     static hls::stream<float> out_stream("output_stream");
 
 #pragma HLS dataflow
     // dataflow pragma instruct compiler to run following three APIs in parallel
-    load_input(in1, in1_stream, size);
-    compute_softmax(in1_stream, out_stream, size);
-    store_result(out, out_stream, DATA_SIZE);
+    load_input(in1, in1_stream, DIM);
+	compute_softmax(in1_stream, out_stream, DIM);
+    store_result(out, out_stream, DIM);
 }
 }
