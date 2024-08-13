@@ -33,7 +33,7 @@
 
 //typedef ap_fixed<18, 9> half_t;
 
-static void reshape_x(float* in, hls::stream<float>& outStream, int size) {
+static void reshape(float* in, hls::stream<float>& outStream, int size) {
 change_dim:
     for (int i = 0; i < size; i++) {
 #pragma HLS PIPELINE II=1
@@ -41,13 +41,13 @@ change_dim:
     }
 }
 
-static void reshape_weight(float* in, hls::stream<float>& outStream, int size) {
-change_dim:
-    for (int i = 0; i < size; i++) {
-#pragma HLS PIPELINE II=1
-        outStream.write(in[i]);
-    }
-}
+// static void reshape_weight(float* in, hls::stream<float>& outStream, int size) {
+// change_dim:
+//     for (int i = 0; i < size; i++) {
+// #pragma HLS PIPELINE II=1
+//         outStream.write(in[i]);
+//     }
+// }
 
 static void compute_matmul(hls::stream<float>& xStream,
 						   hls::stream<float>& weightStream,
@@ -68,8 +68,8 @@ static void compute_matmul(hls::stream<float>& xStream,
 #pragma HLS bind_storage variable=a type=RAM_T2P impl=uram
 #pragma HLS bind_storage variable=b type=RAM_T2P impl=uram
 
-#pragma HLS ARRAY_RESHAPE variable=a type=cyclic factor=16
-#pragma HLS ARRAY_RESHAPE variable=b type=cyclic factor=16
+//#pragma HLS ARRAY_RESHAPE variable=a type=cyclic factor=384
+//#pragma HLS ARRAY_RESHAPE variable=b type=cyclic factor=384
 
      for (int i = 0; i < a_max; i++) {
  #pragma HLS PIPELINE II=1
@@ -128,7 +128,7 @@ static void compute_matmul(hls::stream<float>& xStream,
             float aik = a[i * NX + k];
             for(int j = 0; j < NF; j++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS UNROLL skip_exit_check factor=16
+#pragma HLS UNROLL skip_exit_check factor=384
             	conv_result[iNF + j] += aik * b[kNF + j];
             }
         }
@@ -168,15 +168,14 @@ void krnl_conv1D(float* x, float* weight, float* bias, float* out) {
 
 #pragma HLS DATAFLOW
 
-     reshape_x(x, xStream, DATA_SIZE_X);
-     reshape_weight(weight, weightStream, DATA_SIZE_WEIGHT);
+     reshape(x, xStream, DATA_SIZE_X);
+     reshape(weight, weightStream, DATA_SIZE_WEIGHT);
 
      for (int i = 0; i < DATA_SIZE_BIAS; i++) {
          biasStream.write(bias[i]);
      }
 
      compute_matmul(xStream, weightStream, biasStream, outStream);
-//    compute_matmul(x, weight, bias, out);
      store_result(out, outStream, DATA_SIZE_RES);
 }
 }
