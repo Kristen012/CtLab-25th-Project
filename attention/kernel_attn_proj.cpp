@@ -36,10 +36,13 @@ static void compute_attn(float* qkv_res_buf,
                         int s,
                         float* out_buf) {
 
+#pragma HLS DATAFLOW
+
 init_c_proj:
     for (int i = 0; i<s; i++) {
         for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
             out_buf[i*EMB + j] = c_proj_bias_buf[j];
         }
     }
@@ -49,10 +52,12 @@ compute_c_proj:
             int idx_o = i*EMB;
             for (int m = 0; m<HEAD_DIM; m++) {
                 int qkv_idx = k*s*HEAD_DIM + i*HEAD_DIM + m;
+                float qkv_res_buf_tmp = qkv_res_buf[qkv_idx];
                 for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
                     int weight_idx = (k*HEAD_DIM + m)*EMB + j;
-                    out_buf[idx_o + j] += qkv_res_buf[qkv_idx] * c_proj_weight_buf[weight_idx];
+                    out_buf[idx_o + j] += qkv_res_buf_tmp * c_proj_weight_buf[weight_idx];
                 }
             }
         }
@@ -87,7 +92,12 @@ void krnl_c_proj(float* qkv_res, float* c_proj_weight, float* c_proj_bias, int s
 #pragma HLS bind_storage variable=c_proj_weight_buf type=RAM_T2P impl=uram
 #pragma HLS bind_storage variable=out_buf type=RAM_T2P impl=bram
 
-// #pragma HLS DATAFLOW
+#pragma HLS ARRAY_RESHAPE variable=c_proj_weight_buf type=cyclic factor=8
+#pragma HLS ARRAY_RESHAPE variable=c_proj_bias_buf type=cyclic factor=8
+#pragma HLS ARRAY_RESHAPE variable=out_buf type=cyclic factor=8
+
+
+#pragma HLS DATAFLOW
 
     reshape(qkv_res, qkv_res_buf, s*EMB);
     reshape(c_proj_weight, c_proj_weight_buf, DATA_SIZE_PROJ_WEIGHT);

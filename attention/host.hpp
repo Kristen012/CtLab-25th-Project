@@ -72,62 +72,92 @@ struct aligned_allocator
     free(p);
   }
 };
+
+int s = 127; // TODO
+
 float k_cache[12][768432]; // 12, 1024, 64 // 12個block各自attn的kv cache
 float v_cache[12][768432]; // 12, 1024, 64
+float k_tmp[786432];
+float v_tmp[786432];
+
 int idx_cache = 0;
-void upd_kv_cache(float* cur_k, float* cur_v, int block, int s) {
-	for (int i = 0; i<s*64; i++) {
-		k_cache[block][idx_cache] = cur_k[i];
-		v_cache[block][idx_cache] = cur_v[i];
-        idx_cache++;
-	}
+
+void upd_kv_cache(float* cur_k, float* cur_v, int block, int head, int iter) {
+    // cur接在s*64的尾巴
+    // 當前head之後的都放到tmp往後移
+    if (iter != 0) {
+        for (int i = 0; i<11-head; i++) {
+            for (int j = 0; j<s; j++) {
+                for (int k = 0; k<64; k++) {
+                    k_tmp[i*s*64 + j*64 + k] = k_cache[block][head*(s+1)*64 + s*64 + i*s*64 + j*64 + k];
+                    v_tmp[i*s*64 + j*64 + k] = v_cache[block][head*(s+1)*64 + s*64 + i*s*64 + j*64 + k];
+                }
+            }
+        }
+        for (int i = 0; i<64; i++) {
+            k_cache[block][head*(s+1)*64 + s*64 + i] = cur_k[i];
+            v_cache[block][head*(s+1)*64 + s*64 + i] = cur_v[i];
+        }
+        for (int i = 0; i<11-head; i++) {
+            for (int j = 0; j<s; j++) {
+                for (int k = 0; k<64; k++) {
+                    k_cache[block][head*(s+1)*64 + (s+1)*64 + i*s*64 + j*64 + k] = k_tmp[i*s*64 + j*64 + k];
+                    v_cache[block][head*(s+1)*64 + (s+1)*64 + i*s*64 + j*64 + k] = v_tmp[i*s*64 + j*64 + k];
+                }
+            }
+        }
+    }
+    else {
+        for (int i = 0; i<s*64; i++) {
+            k_cache[block][head*s*64 + i] = cur_k[i];
+            v_cache[block][head*s*64 + i] = cur_v[i];
+        }
+    }
 
 }
-// dataPrepare是用來初始化test case data的地方，輸入為指標(array)
-// void dataPrepare(float *Array, int Nb_Of_Elements){
-//    int val = -5;
-//    for(int i=0;i<Nb_Of_Elements;i++){
-//      Array[i] = val+0.2*i;
-//    }
-// }
 float tmp[1769472 + 1];
-void dataPrepare(float *Array, int Nb_Of_Elements, int flag, int host_wi, int s, int iter) {
+void dataPrepare(float *Array, int Nb_Of_Elements, int flag, int host_wi, int iter) {
     ifstream infile;
 	if (flag == 0) {
-		if(iter == 0) infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/ln1_out_iter_1_block_1.txt");
-		else infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/ln1_out_iter_2_block_1.txt");
+		if(iter == 0) infile.open("/home/ywtang23/attn_data/ln_out_iter_1_block_1.txt");
+		else if(iter == 1) infile.open("/home/ywtang23/attn_data/ln_out_iter_2_block_1.txt");
+		else infile.open("/home/ywtang23/attn_data/ln_out_iter_3_block_1.txt");
 	} else if (flag == 1 || flag == 2 || flag == 3) {
-        infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/transformer.h.0.attn.c_attn.weight_split_head.txt");
+        infile.open("/home/ywtang23/attn_data/transformer.h.0.attn.c_attn.weight_split_head.txt");
     } else if (flag == 4 || flag == 5 || flag == 6) {
-        infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/transformer.h.0.attn.c_attn.bias_split_head.txt");
+        infile.open("/home/ywtang23/attn_data/transformer.h.0.attn.c_attn.bias_split_head.txt");
 	} else if (flag == 7) {
-//        infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/past_key_iter_2_block_1.txt");
+//        infile.open("/home/ywtang23/attn_data/past_key_iter_2_block_1.txt");
 		for (int i = 0; i<Nb_Of_Elements; i++) Array[i] = 0;
 	} else if (flag == 8) {
-//        infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/past_value_iter_2_block_1.txt");
+//        infile.open("/home/ywtang23/attn_data/past_value_iter_2_block_1.txt");
 		for (int i = 0; i<Nb_Of_Elements; i++) Array[i] = 0;
 	} else if (flag == 9) {
-        infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/transformer.h.0.attn.c_proj.weight.txt");
+        infile.open("/home/ywtang23/attn_data/transformer.h.0.attn.c_proj.weight.txt");
 	} else if (flag == 10) {
-		infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/transformer.h.0.attn.c_proj.bias.txt");
-	} else if (flag == 11) {
-		if(iter == 0) infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/matmul_2_iter_1_block_1.txt");
-		else infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/matmul_2_iter_2_block_1.txt");
-	} else if (flag == 12) {
-		if(iter == 0) infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/attn_output_iter_1_block_1.txt");
-		else infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/attn_cproj_output_iter_2_block_1.txt");
+		infile.open("/home/ywtang23/attn_data/transformer.h.0.attn.c_proj.bias.txt");
+	}
+	else if (flag == 11) {
+		infile.open("/home/ywtang23/attn_data/qkv_res_iter_1_block_1.txt");
+	}
+	else if (flag == 12) {
+		if(iter == 0) infile.open("/home/ywtang23/attn_data/cproj_out_iter_1_block_1.txt");
+		else if(iter == 1) infile.open("/home/ywtang23/attn_data/cproj_out_iter_2_block_1.txt");
+		else if(iter == 2)infile.open("/home/ywtang23/attn_data/cproj_out_iter_3_block_1.txt");
 	} else if (flag == 13) {
-		infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/past_key_iter_2_block_1.txt");
+		if(iter == 1) infile.open("/home/ywtang23/attn_data/key_after_kvcache_iter_2_block_1.txt");
+		else infile.open("/home/ywtang23/attn_data/key_after_kvcache_iter_3_block_1.txt");
 	} else if (flag == 14) {
-		infile.open("/home/ywtang23/attn_test1/Attention/testing_data_txt/past_value_iter_2_block_1.txt");
+		if(iter == 1) infile.open("/home/ywtang23/attn_data/value_after_kvcache_iter_2_block_1.txt");
+		else infile.open("/home/ywtang23/attn_data/value_after_kvcache_iter_3_block_1.txt");
 	}
 	else {
-        cerr << "Invalid flag" << endl;
-        return;
+        // cerr << "Invalid flag" << endl;
+        // return;
     }
 
     if (!infile && (flag != 7 || flag != 8)) {
-        cerr << "Error opening file." << endl;
+        cerr << "Error opening file" << flag << endl;
         return;
     }
 
@@ -190,7 +220,7 @@ void dataPrepare(float *Array, int Nb_Of_Elements, int flag, int host_wi, int s,
 			}
 			else {
 				for (int i = 0; i<s*64; i++) {
-					Array[i] = k_cache[0][host_wi*s*64 + i];
+					Array[i] = k_cache[0][host_wi*(s+1)*64 + i];
 				}
 			}
 		}
@@ -202,7 +232,7 @@ void dataPrepare(float *Array, int Nb_Of_Elements, int flag, int host_wi, int s,
 			}
 			else {
 				for (int i = 0; i<s*64; i++) {
-					Array[i] = v_cache[0][host_wi*s*64 + i];
+					Array[i] = v_cache[0][host_wi*(s+1)*64 + i];
 				}
 			}
 		}

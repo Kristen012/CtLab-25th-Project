@@ -113,17 +113,17 @@ int main(int argc, char* argv[]) {
 	cout << "HOST-Info: (Step 1) Check Command Line Arguments                      " << endl;
 	cout << "HOST-Info: ============================================================= " << endl;
 	#endif
-    
+
     if(argc != 4){
         cout << "HOST-Error: Incorrect command line syntax " << endl;
 		cout << "HOST-Info:  Usage: " << argv[0] << " <Platform_Vendor> <Device_Name> <XCLBIN_File>  <Test Vectors Size>" << endl << endl;
         return EXIT_FAILURE;
     }
-    
+
     string Target_Platform_Vendor   = argv[1];
 	string Target_Device_Name       = argv[2];
 	string xclbinFilename           = argv[3];
-    
+
     #ifdef ALL_MESSAGES
 	cout << "HOST-Info: Platform_Vendor   : " << Target_Platform_Vendor << endl;
 	cout << "HOST-Info: Device_Name       : " << Target_Device_Name << endl;
@@ -131,13 +131,13 @@ int main(int argc, char* argv[]) {
 	#endif
 
     // ============================================================================
-	// Step 2: Detect Target Platform and Target Device in a system. 
+	// Step 2: Detect Target Platform and Target Device in a system.
 	//         Create Context and Command Queue.
 	// ============================================================================
 	// Variables:
-	//   o) Target_Platform_Vendor[] - defined as main() input argument 
+	//   o) Target_Platform_Vendor[] - defined as main() input argument
 	//   o) Target_Device_Name[]     - defined as main() input argument
-	// 
+	//
 	// After that
 	//   o) Create a Context
 	//   o) Create a Command Queue
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]) {
     #ifdef ALL_MESSAGES
 	cout << "HOST-Info: Number of detected platforms : " << platforms.size() << endl;
 	#endif
-    
+
     // Search for Platform (ex: Xilinx) using: CL_PLATFORM_VENDOR = Target_Platform_Vendor
     // Traversing all Platforms To find Xilinx Platform and targeted Device in Xilinx Platform
     // Check if the current platform matches Target_Platform_Vendor
@@ -325,8 +325,8 @@ int main(int argc, char* argv[]) {
     float* ptr_cur_v;
     float* ptr_attn_result;
 
-    int s = 127; // TODO
-    // These commands will allocate memory on the .Device 
+
+    // These commands will allocate memory on the .Device
     // The cl::Buffer objects can be used to reference the memory locations on the device.
     /* 以下區域為input data傳入host的code，只需要複製並且更改參數和型別即可(size_in_bytes(考慮input大小(byte)), ptr_DataIn_1, DATA_SIZE(考慮input大小))*/
         /*-- ptr_Data_x --*/
@@ -427,7 +427,7 @@ int main(int argc, char* argv[]) {
         #endif
         OCL_CHECK(err,
                 ptr_Data_v_tiling = (float*)q.enqueueMapBuffer(buffer_Data_v_tiling, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes_cache_tiled, NULL, NULL, &err));
-        
+
         // Init output data buffer
         /*---qkv_res---*/
         #ifdef ALL_MESSAGES
@@ -458,7 +458,7 @@ int main(int argc, char* argv[]) {
         cout << "HOST-Info: Mapping buffer_cur_v to ptr_cur_v ... " << endl;
         #endif
         OCL_CHECK(err, ptr_cur_v = (float*)q.enqueueMapBuffer(buffer_cur_v, CL_TRUE, CL_MAP_READ, 0, size_in_bytes_cur_k_v, NULL, NULL, &err));
-        
+
         /*-- ptr_Data_c_proj_weight --*/
         #ifdef ALL_MESSAGES
         cout << "HOST-Info: Allocating Memory buffer_Data_c_proj_weight for Data_c_proj_weight ... " << endl;
@@ -469,7 +469,7 @@ int main(int argc, char* argv[]) {
         #endif
         OCL_CHECK(err,
                 ptr_Data_c_proj_weight = (float*)q.enqueueMapBuffer(buffer_Data_c_proj_weight, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes_c_proj_weight, NULL, NULL, &err));
-        
+
 
         /*-- ptr_Data_c_proj_bias --*/
         #ifdef ALL_MESSAGES
@@ -481,7 +481,7 @@ int main(int argc, char* argv[]) {
         #endif
         OCL_CHECK(err,
                 ptr_Data_c_proj_bias = (float*)q.enqueueMapBuffer(buffer_Data_c_proj_bias, CL_TRUE, CL_MAP_WRITE, 0, size_in_bytes_c_proj_bias, NULL, NULL, &err));
-        
+
         // Init output data buffer
         #ifdef ALL_MESSAGES
         cout << "HOST-Info: Allocating Memory buffer_attn_result for RES Array ... " << endl;
@@ -492,15 +492,15 @@ int main(int argc, char* argv[]) {
         #endif
         OCL_CHECK(err, ptr_attn_result = (float*)q.enqueueMapBuffer(buffer_attn_result, CL_TRUE, CL_MAP_READ, 0, size_in_bytes_res, NULL, NULL, &err));
 
-    for (int iter = 0; iter < 2; iter++) {
+    for (int iter = 0; iter < 3; iter++) {
+        if(iter > 1) s += 1;
         int query_s = (iter != 0) ? 1 : s;
-        int x_s = (iter != 0) ? 768 : s;
         for (int host_wi = 0; host_wi<12; host_wi++) {
             #ifdef ALL_MESSAGES
             cout << "HOST-Info: Generating buffer_Data_x ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_x, DATA_SIZE_X, 0, -1, x_s, iter);
+            dataPrepare(ptr_Data_x, query_s*768, 0, -1, iter);
             cout << "x: " << ptr_Data_x[0] << " " << ptr_Data_x[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_X << " values" << endl;
@@ -510,7 +510,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_w_tiling_q ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_w_tiling_q, DATA_SIZE_C_ATTN_WEIGHT_TILED, 1, host_wi, s, iter);
+            dataPrepare(ptr_Data_w_tiling_q, DATA_SIZE_C_ATTN_WEIGHT_TILED, 1, host_wi, iter);
             cout << "w_tiling_q: " << ptr_Data_w_tiling_q[0] << " " << ptr_Data_w_tiling_q[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_WEIGHT_TILED << " values" << endl;
@@ -520,7 +520,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_w_tiling_k ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_w_tiling_k, DATA_SIZE_C_ATTN_WEIGHT_TILED, 2, host_wi, s, iter);
+            dataPrepare(ptr_Data_w_tiling_k, DATA_SIZE_C_ATTN_WEIGHT_TILED, 2, host_wi, iter);
             cout << "w_tiling_k: " << ptr_Data_w_tiling_k[0] << " " << ptr_Data_w_tiling_k[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_WEIGHT_TILED << " values" << endl;
@@ -530,7 +530,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_w_tiling_v ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_w_tiling_v, DATA_SIZE_C_ATTN_WEIGHT_TILED, 3, host_wi, s, iter);
+            dataPrepare(ptr_Data_w_tiling_v, DATA_SIZE_C_ATTN_WEIGHT_TILED, 3, host_wi, iter);
             cout << "w_tiling_v: " << ptr_Data_w_tiling_v[0] << " " << ptr_Data_w_tiling_v[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_WEIGHT_TILED << " values" << endl;
@@ -540,7 +540,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_bias_tiling_q ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_bias_tiling_q, DATA_SIZE_C_ATTN_BIAS_TILED, 4, host_wi, s, iter);
+            dataPrepare(ptr_Data_bias_tiling_q, DATA_SIZE_C_ATTN_BIAS_TILED, 4, host_wi, iter);
             cout << "bias_tiling_q: " << ptr_Data_bias_tiling_q[0] << " " << ptr_Data_bias_tiling_q[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_BIAS_TILED << " values" << endl;
@@ -550,7 +550,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_bias_tiling_k ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_bias_tiling_k, DATA_SIZE_C_ATTN_BIAS_TILED, 5, host_wi, s, iter);
+            dataPrepare(ptr_Data_bias_tiling_k, DATA_SIZE_C_ATTN_BIAS_TILED, 5, host_wi, iter);
             cout << "bias_tiling_k: " << ptr_Data_bias_tiling_k[0] << " " << ptr_Data_bias_tiling_k[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_BIAS_TILED << " values" << endl;
@@ -560,7 +560,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_bias_tiling_v ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_bias_tiling_v, DATA_SIZE_C_ATTN_BIAS_TILED, 6, host_wi, s, iter);
+            dataPrepare(ptr_Data_bias_tiling_v, DATA_SIZE_C_ATTN_BIAS_TILED, 6, host_wi, iter);
             cout << "bias_tiling_v: " << ptr_Data_bias_tiling_v[0] << " " << ptr_Data_bias_tiling_v[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_C_ATTN_BIAS_TILED << " values" << endl;
@@ -570,7 +570,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_k_tiling ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_k_tiling, DATA_SIZE_CACHE_TILED, 7, host_wi, s, iter);
+            dataPrepare(ptr_Data_k_tiling, DATA_SIZE_CACHE_TILED, 7, host_wi, iter);
             cout << "k_tiling: " << ptr_Data_k_tiling[0] << " " << ptr_Data_k_tiling[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_CACHE_TILED << " values" << endl;
@@ -580,7 +580,7 @@ int main(int argc, char* argv[]) {
             cout << "HOST-Info: Generating buffer_Data_v_tiling ..." << endl;
             #endif
             // Call dataPrepare to init data
-            dataPrepare(ptr_Data_v_tiling, DATA_SIZE_CACHE_TILED, 8, host_wi, s, iter);
+            dataPrepare(ptr_Data_v_tiling, DATA_SIZE_CACHE_TILED, 8, host_wi, iter);
             cout << "v_tiling: " << ptr_Data_v_tiling[0] << " " << ptr_Data_v_tiling[1] << endl;
             #ifdef ALL_MESSAGES
             cout << "           Generated " << DATA_SIZE_CACHE_TILED << " values" << endl;
@@ -588,7 +588,7 @@ int main(int argc, char* argv[]) {
             // Data will be migrated to kernel space
             // 考慮input量，若有多份則要改成{buffer_DataIn1, buffer_DataIn2...}
             OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_Data_x, buffer_Data_w_tiling_q, buffer_Data_w_tiling_k, buffer_Data_w_tiling_v, buffer_Data_bias_tiling_q, buffer_Data_bias_tiling_k, buffer_Data_bias_tiling_v, buffer_Data_k_tiling, buffer_Data_v_tiling}, 0 /* 0 means from host*/));
-        
+
             // ============================================================================
             // Step 5: Set Kernel Arguments and Run the Application
             //         o) Set Kernel Arguments
@@ -600,7 +600,7 @@ int main(int argc, char* argv[]) {
             //  			 krnl_attn	    2				GlobMem_BUF_RES
             //  			 krnl_attn	    3				CONST_arg
             // 				----------------------------------------------------
-            //         
+            //
             //         o) Submit Kernels for Execution
             //         o) Copy Results from Global Memory to Host
             // ============================================================================
@@ -628,13 +628,13 @@ int main(int argc, char* argv[]) {
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, buffer_Data_k_tiling));
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, buffer_Data_v_tiling));
 
-            OCL_CHECK(err, err = krnl_attn.setArg(narg++, 127)); // prefill len for iter0 and 1, then +1 for each iteration
+            OCL_CHECK(err, err = krnl_attn.setArg(narg++, s)); // prefill len for iter0 and 1, then +1 for each iteration
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, iter));
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, host_wi));
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, buffer_qkv_result));
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, buffer_cur_k));
             OCL_CHECK(err, err = krnl_attn.setArg(narg++, buffer_cur_v));
-            
+
             // ----------------------------------------
             // Step 5.2: Submit Kernels for Execution
             // ----------------------------------------
@@ -669,33 +669,16 @@ int main(int argc, char* argv[]) {
             // ------------------------------------------------------
             /* 此處為error detection，可以選擇直接印出來*/
             // bool error_detected = false;
-            float host_result[768*query_s];
-            dataPrepare(host_result, 768*query_s, 11, -1, s, iter);
-            cout << "=======" << iter << "=======" << endl;
-            cout << "=======" << host_wi << "=======" << endl;
-            cout << "=======QKV_RES=======" << endl;
-            for (int i = 0; i < 768*query_s; i++) {
-                if(abs(host_result[i] - ptr_qkv_result[i]) > 0.001 && host_wi == 11)
-                    cout << i << " " << host_result[i] << " " << ptr_qkv_result[i] << endl;
-                //   cout << ptr_qkv_result[i] << " ";
-                //   if(i%10 == 0) cout << endl;
-            //        cout << host_result << " " << ptr_qkv_result[i] << endl;
-            //    if (abs(ptr_qkv_result[i] - host_result[i]) > 0.005) {
-            //         cout << "host_result" << host_result[i] << " krnl_result" << " " << ptr_qkv_result[i] << endl;
-            //         // printf(error_message.c_str(), i, host_result, ptr_qkv_result[i]);
-            //         error_detected = true;
-            //         break;
-            //    }
-            }
+
             // cout << "=======K_TILING=======" << endl;
-            // for (int i = 0; i<768*127; i++) {
+            // for (int i = 0; i<768*query_s; i++) {
             //     cout << ptr_cur_k[i] << endl;
             // }
             // cout << "=======V_TILING=======" << endl;
-            // for (int i = 0; i<768*127; i++) {
+            // for (int i = 0; i<768*query_s; i++) {
             //     cout << ptr_cur_v[i] << endl;
             // }
-            upd_kv_cache(ptr_cur_k, ptr_cur_v, 0, s);
+            upd_kv_cache(ptr_cur_k, ptr_cur_v, 0, host_wi, iter);
             // ============================================================================
             // Step 7: Custom Profiling
             // ============================================================================
@@ -709,11 +692,31 @@ int main(int argc, char* argv[]) {
             // string list_of_kernel_names[Nb_Of_Kernels];
             // list_of_kernel_names[0]="krnl_attn";
             // run_custom_profiling (Nb_Of_Kernels,Nb_Of_Memory_Tranfers,K_exe_event,Mem_op_event,list_of_kernel_names);
-            
 
+            if(iter == 0) {
+                float host_result[127*768];
+                dataPrepare(host_result, 127*768, 11, -1, iter);
+                    cout << "=======" << iter << "=======" << endl;
+                    cout << "=======" << host_wi << "=======" << endl;
+                    cout << "=======QKV_RES=======" << endl;
+                    for (int i = 0; i < 127*64; i++) {
+                        // if(abs(host_result[host_wi*127*64 + i] - ptr_qkv_result[i]) > 0.001)
+                            cout << i << " " << host_result[host_wi*127*64 + i] << " " << ptr_qkv_result[i] << endl;
+                        //   cout << ptr_qkv_result[i] << " ";
+                        //   if(i%10 == 0) cout << endl;
+                    //        cout << host_result << " " << ptr_qkv_result[i] << endl;
+                    //    if (abs(ptr_qkv_result[i] - host_result[i]) > 0.005) {
+                    //         cout << "host_result" << host_result[i] << " krnl_result" << " " << ptr_qkv_result[i] << endl;
+                    //         // printf(error_message.c_str(), i, host_result, ptr_qkv_result[i]);
+                    //         error_detected = true;
+                    //         break;
+                    //    }
+                    }
+            }
 
             // cout << "HOST-Info: TEST " << (error_detected ? "FAILED" : "PASSED") << endl;
         }
+        
         // // ============================================================================
         // // Step 8: Release Allocated Resources
         // // ============================================================================
@@ -731,23 +734,23 @@ int main(int argc, char* argv[]) {
         // // OCL_CHECK(err, err = q.enqueueUnmapMemObject(buffer_qkv_result, ptr_qkv_result));
         // OCL_CHECK(err, err = q.finish());
 
-        
+
         // Call dataPrepare to init data
         #ifdef ALL_MESSAGES
         cout << "HOST-Info: Generating buffer_Data_c_proj_weight ..." << endl;
         #endif
-        dataPrepare(ptr_Data_c_proj_weight, DATA_SIZE_C_PROJ_WEIGHT, 9, -1, s, iter);
+        dataPrepare(ptr_Data_c_proj_weight, DATA_SIZE_C_PROJ_WEIGHT, 9, -1, iter);
         cout << "c_proj_weight: " << ptr_Data_c_proj_weight[0] << " " << ptr_Data_c_proj_weight[1] << endl;
         #ifdef ALL_MESSAGES
         cout << "           Generated " << DATA_SIZE_C_PROJ_WEIGHT << " values" << endl;
         #endif
 
-        
+
         // Call dataPrepare to init data
         #ifdef ALL_MESSAGES
         cout << "HOST-Info: Generating buffer_Data_c_proj_weight ..." << endl;
         #endif
-        dataPrepare(ptr_Data_c_proj_bias, DATA_SIZE_C_PROJ_BIAS, 10, -1, s, iter);
+        dataPrepare(ptr_Data_c_proj_bias, DATA_SIZE_C_PROJ_BIAS, 10, -1, iter);
         cout << "c_proj_bias: " << ptr_Data_c_proj_bias[0] << " " << ptr_Data_c_proj_bias[1] << endl;
         #ifdef ALL_MESSAGES
         cout << "           Generated " << DATA_SIZE_C_PROJ_BIAS << " values" << endl;
@@ -780,50 +783,63 @@ int main(int argc, char* argv[]) {
         cout << "Point 3" << endl;
         // bool error_detected = false;
         float host_result[768*query_s];
-        dataPrepare(host_result, 768*query_s, 12, -1, s, iter);
+        dataPrepare(host_result, 768*query_s, 12, -1, iter);
+        cout << "=======ITER " << iter << " =======" << endl;
         cout << "=======ATTN_RES=======" << endl;
-        for (int i = 0; i < 768*query_s; i++) {
-            // if(abs(host_result[i] - ptr_attn_result[i]) > 0.001)
-                cout << i << " " << host_result[i] << " " << ptr_attn_result[i] << endl;
-        }
+        // for (int i = 0; i < 768*query_s; i++) {
+        //     if(abs(host_result[i] - ptr_attn_result[i]) > 0.001)
+        //         cout << i << " " << host_result[i] << " " << ptr_attn_result[i] << endl;
+        // }
         float cnt = 0;
         int cnt_0 = 0;
-        for (int i = 0; i<768*query_s; i++) {
-            if(host_result[i] != 0) cnt += (abs(host_result[i] - ptr_attn_result[i])/host_result[i]);
-            else cnt_0++;
+        for (int i = 0; i < 768 * query_s; i++) {
+            if (isnan(host_result[i]) || isnan(ptr_attn_result[i])) {
+                cout << "NaN detected at index " << i << " " << host_result[i] << " " << ptr_attn_result[i] << endl;
+            }
+            if (host_result[i] != 0) {
+                cnt += abs((abs(host_result[i] - ptr_attn_result[i]) / host_result[i]));
+            } else {
+                cnt_0++;
+            }
         }
+        cout << cnt << endl;
         cnt /= (768*query_s-cnt_0);
         cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
 
-        dataPrepare(host_result, 768*s, 13, -1, s, iter);
-        cout << "=======K_CACHE=======" << endl;
-        for (int i = 0; i < 768*s; i++) {
-            if(abs(host_result[i] - k_cache[0][i]) > 0.001)
-                cout << i << " " << k_cache[0][i] << endl;
-        }
-        cnt = 0;
-        cnt_0 = 0;
-        for (int i = 0; i<768*s; i++) {
-            if(host_result[i] != 0) cnt += (abs(host_result[i] - k_cache[0][i])/host_result[i]);
-            else cnt_0++;
-        }
-        cnt /= (768*s-cnt_0);
-        cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+        if(iter != 0) {
+            float host_kv[768432];
+            
+            cout << "===s: " << s << "===" << endl;
+            dataPrepare(host_kv, 768*(s+1), 13, -1, iter);
+            cout << "=======K_CACHE=======" << endl;
+            for (int i = 0; i < 768*(s+1); i++) {
+                if(abs(host_kv[i] - k_cache[0][i]) > 0.001)
+                    cout << i << " " << k_cache[0][i] << " " << host_kv[i] << endl;
+            }
+            cnt = 0;
+            cnt_0 = 0;
+            for (int i = 0; i<768*(s+1); i++) {
+                if(host_kv[i] != 0) cnt += abs((abs(host_kv[i] - k_cache[0][i])/host_kv[i]));
+                else cnt_0++;
+            }
+            cnt /= (768*(s+1)-cnt_0);
+            cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
 
-        dataPrepare(host_result, 768*s, 14, -1, s, iter);
-        cout << "=======V_CACHE=======" << endl;
-        for (int i = 0; i < 768*s; i++) {
-            if(abs(host_result[i] - v_cache[0][i]) > 0.001)
-                cout << i << " " << v_cache[0][i] << endl;
+            dataPrepare(host_kv, 768*(s+1), 14, -1, iter);
+            cout << "=======V_CACHE=======" << endl;
+            for (int i = 0; i < 768*(s+1); i++) {
+                if(abs(host_kv[i] - v_cache[0][i]) > 0.001)
+                    cout << i << " " << v_cache[0][i] << " " << host_kv[i] << endl;
+            }
+            cnt = 0;
+            cnt_0 = 0;
+            for (int i = 0; i<768*(s+1); i++) {
+                if(host_kv[i] != 0) cnt += abs((abs(host_kv[i] - v_cache[0][i])/host_kv[i]));
+                else cnt_0++;
+            }
+            cnt /= (768*(s+1)-cnt_0);
+            cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
         }
-        cnt = 0;
-        cnt_0 = 0;
-        for (int i = 0; i<768*s; i++) {
-            if(host_result[i] != 0) cnt += (abs(host_result[i] - v_cache[0][i])/host_result[i]);
-            else cnt_0++;
-        }
-        cnt /= (768*s-cnt_0);
-        cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
     }
     // ============================================================================
     // Step 8: Release Allocated Resources

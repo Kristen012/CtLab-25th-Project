@@ -43,7 +43,7 @@ static void compute_attn(float* x_buf,
                         int s,
                         int iter,
                         int host_wi,
-                        float* out_buf, 
+                        float* out_buf,
                         float* cur_k_buf,
                         float* cur_v_buf) {
 
@@ -51,7 +51,11 @@ static void compute_attn(float* x_buf,
     float qk_result[QK_RES_MAX];
 
 #pragma HLS bind_storage variable=q_attn type=RAM_T2P impl=uram
-#pragma HLS bind_storage variable=qk_result type=RAM_T2P impl=uram
+#pragma HLS bind_storage variable=qk_result type=RAM_T2P impl=bram
+
+// #pragma HLS ARRAY_RESHAPE variable=q_attn type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=qk_result type=cyclic factor=8
+
 
     int query_s = (iter != 0) ? 1 : s;
     int cur_s = s;
@@ -61,55 +65,27 @@ init_q_attn_cur_k_attn_cur_c_attn:
     for (int i = 0; i<query_s; i++) {
         for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
             int idx = i*HEAD_DIM + j;
             q_attn[idx] = bias_tiling_q_buf[j];
-        }
-    }
-    for (int i = 0; i<query_s; i++) {
-        for (int j = 0; j<HEAD_DIM; j++) {
-#pragma HLS PIPELINE II=1
-            int idx = i*HEAD_DIM + j;
             cur_k_buf[idx] = bias_tiling_k_buf[j];
-        }
-    }
-    for (int i = 0; i<query_s; i++) {
-        for (int j = 0; j<HEAD_DIM; j++) {
-#pragma HLS PIPELINE II=1
-            int idx = i*HEAD_DIM + j;
             cur_v_buf[idx] = bias_tiling_v_buf[j];
         }
     }
+
 compute_q_attn_cur_k_attn_cur_c_attn:
     for (int i = 0; i<query_s; i++) {
         for (int k = 0; k<EMB; k++) {
-            int idx_x = i*EMB + k;
+            // int idx_x = i*EMB + k;
+            float x_buf_tmp = x_buf[i*EMB + k];
             for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
                 int idx_w = k*HEAD_DIM + j;
                 int idx_attn = i*HEAD_DIM + j;
-                q_attn[idx_attn] += x_buf[idx_x] * w_tiling_q_buf[idx_w];
-            }
-        }
-    }
-    for (int i = 0; i<query_s; i++) {
-        for (int k = 0; k<EMB; k++) {
-            int idx_x = i*EMB + k;
-            for (int j = 0; j<HEAD_DIM; j++) {
-#pragma HLS PIPELINE II=1
-                int idx_w = k*HEAD_DIM + j;
-                int idx_attn = i*HEAD_DIM + j;
-                cur_k_buf[idx_attn] += x_buf[idx_x] * w_tiling_k_buf[idx_w];
-            }
-        }
-    }
-    for (int i = 0; i<query_s; i++) {
-        for (int k = 0; k<EMB; k++) {
-            int idx_x = i*EMB + k;
-            for (int j = 0; j<HEAD_DIM; j++) {
-#pragma HLS PIPELINE II=1
-                int idx_w = k*HEAD_DIM + j;
-                int idx_attn = i*HEAD_DIM + j;
-                cur_v_buf[idx_attn] += x_buf[idx_x] * w_tiling_v_buf[idx_w];
+                q_attn[idx_attn] += x_buf_tmp * w_tiling_q_buf[idx_w];
+                cur_k_buf[idx_attn] += x_buf_tmp * w_tiling_k_buf[idx_w];
+                cur_v_buf[idx_attn] += x_buf_tmp * w_tiling_v_buf[idx_w];
             }
         }
     }
@@ -124,17 +100,10 @@ stack_past_k_v:
         int idx_i = i*HEAD_DIM;
         for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
             int idx_k_v = offset + idx_i + j;
             int idx_cur = idx_i + j;
             k_tiling_buf[idx_k_v] = cur_k_buf[idx_cur];
-        }
-    }
-    for (int i = 0; i<cur_s; i++) {
-        int idx_i = i*HEAD_DIM;
-        for (int j = 0; j<HEAD_DIM; j++) {
-#pragma HLS PIPELINE II=1
-            int idx_k_v = offset + idx_i + j;
-            int idx_cur = idx_i + j;
             v_tiling_buf[idx_k_v] = cur_v_buf[idx_cur];
         }
     }
@@ -143,20 +112,26 @@ qk_matmul:
     if(iter != 0) qk_s = cur_s;
     else qk_s = s*s;
 init_qk_result:
-    for (int i = 0; i<qk_s; i++) qk_result[i] = 0;
+    for (int i = 0; i<qk_s; i++) {
+#pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL factor=4
+        qk_result[i] = 0;
+    }
 compute_qk_result:
     for (int i = 0; i<query_s; i++) {
-        for (int k = 0; k<HEAD_DIM; k++) {
-            int idx_q = i*HEAD_DIM + k;
+        for (int j = 0; j<cur_s; j++) {
             int idx_i = i*cur_s;
-            for (int j = 0; j<cur_s; j++) {
+            for (int k = 0; k<HEAD_DIM; k++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS UNROLL skip_exit_check factor=8
+                int idx_q = i*HEAD_DIM + k;
                 qk_result[idx_i + j] += q_attn[idx_q] * k_tiling_buf[k + j*HEAD_DIM];
             }
         }
     }
     for (int i = 0; i<qk_s; i++) {
 #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL factor=4
         qk_result[i] *= 0.125;
     }
 
@@ -165,6 +140,7 @@ mask:
         for (int i = 0; i<s; i++) {
             for (int j = i+1; j<s; j++) {
 #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL factor=4
                 qk_result[i*s + j] = -10000000;
             }
         }
@@ -173,16 +149,19 @@ mask:
 softmax:
     for (int j = 0; j<query_s; j++) {
         float sum;
-        float buffer[S_MAX];
+        float buffer[1024];
+#pragma HLS bind_storage variable=buffer type=ram_t2p
         sum = 0;
         int js = j*cur_s;
         for (int i = 0; i<cur_s; i++) {
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE II=1 style = frp
+// #pragma HLS UNROLL factor=4
             buffer[i] = qk_result[js + i];
             sum = sum + hls::exp(buffer[i]);
         }
         for (int i = 0; i<cur_s; i++) {
-#pragma HLS PIPELINE II=1
+#pragma HLS PIPELINE II=1 style = frp
+// #pragma HLS UNROLL factor=4
             qk_result[js + i] = hls::exp(buffer[i]) / sum;
         }
     }
@@ -191,16 +170,19 @@ init_qkv:
     int qkv_offset = host_wi*query_s*HEAD_DIM;
     for (int i = 0; i<qkv_size; i++) {
 #pragma HLS PIPELINE II=1
+// #pragma HLS UNROLL factor=4
         out_buf[qkv_offset + i] = 0;
     }
 compute_qkv:
     for (int i = 0; i<query_s; i++) {
         for (int k = 0; k<cur_s; k++) {
-            int idx_qk = i*cur_s + k;
+            // int idx_qk = i*cur_s + k;
             int idx_v = k*HEAD_DIM;
+            float qk_res_tmp = qk_result[i*cur_s + k];
             for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
-                out_buf[host_wi*query_s*HEAD_DIM + i*HEAD_DIM + j] += qk_result[idx_qk] * v_tiling_buf[idx_v + j];
+#pragma HLS UNROLL skip_exit_check factor=8
+                out_buf[qkv_offset + i*HEAD_DIM + j] += qk_res_tmp * v_tiling_buf[idx_v + j];
             }
         }
     }
@@ -233,18 +215,6 @@ void krnl_attn(float* x, float* w_tiling_q, float* w_tiling_k, float* w_tiling_v
 #pragma HLS INTERFACE m_axi port = v_tiling offset = slave bundle = gmem6 depth = K_V_MAX // inout
 #pragma HLS INTERFACE m_axi port = out offset = slave bundle = gmem9 // inout
 
-//#pragma HLS INTERFACE s_axilite port = x
-//#pragma HLS INTERFACE s_axilite port = w_tiling_q
-//#pragma HLS INTERFACE s_axilite port = w_tiling_k
-//#pragma HLS INTERFACE s_axilite port = w_tiling_v
-//#pragma HLS INTERFACE s_axilite port = bias_tiling_q
-//#pragma HLS INTERFACE s_axilite port = bias_tiling_k
-//#pragma HLS INTERFACE s_axilite port = bias_tiling_v
-//#pragma HLS INTERFACE s_axilite port = k_tiling
-//#pragma HLS INTERFACE s_axilite port = v_tiling
-//#pragma HLS INTERFACE s_axilite port = c_proj_weight
-//#pragma HLS INTERFACE s_axilite port = c_proj_bias
-//#pragma HLS INTERFACE s_axilite port = return
 
     float x_buf[X_SIZE];
     float bias_tiling_q_buf[DATA_SIZE_ATTN_BIAS_TILED];
@@ -269,19 +239,28 @@ void krnl_attn(float* x, float* w_tiling_q, float* w_tiling_k, float* w_tiling_v
 #pragma HLS bind_storage variable=cur_v_buf type=RAM_T2P impl=bram
 #pragma HLS bind_storage variable=out_buf type=RAM_T2P impl=bram
 
+// #pragma HLS ARRAY_RESHAPE variable=x_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=w_tiling_q_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=w_tiling_k_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=w_tiling_v_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=k_tiling_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=v_tiling_buf type=cyclic factor=8
+// #pragma HLS ARRAY_RESHAPE variable=out_buf type=cyclic factor=8
 
-    int out_size = (iter != 0) ? EMB : s*EMB;
+    int cache_out_size = (iter != 0) ? HEAD_DIM : s*HEAD_DIM;
+    int query_s = (iter != 0) ? 1 : s;
+    int out_size = query_s*EMB;
 // #pragma HLS DATAFLOW
 
-    reshape(x, x_buf, s*768);
+    reshape(x, x_buf, query_s*EMB);
     reshape(bias_tiling_q, bias_tiling_q_buf, DATA_SIZE_ATTN_BIAS_TILED);
     reshape(bias_tiling_k, bias_tiling_k_buf, DATA_SIZE_ATTN_BIAS_TILED);
     reshape(bias_tiling_v, bias_tiling_v_buf, DATA_SIZE_ATTN_BIAS_TILED);
     reshape(w_tiling_q, w_tiling_q_buf, DATA_SIZE_ATTN_WEIGHT_TILED);
     reshape(w_tiling_k, w_tiling_k_buf, DATA_SIZE_ATTN_WEIGHT_TILED);
     reshape(w_tiling_v, w_tiling_v_buf, DATA_SIZE_ATTN_WEIGHT_TILED);
-    reshape(k_tiling, k_tiling_buf, K_V_MAX);
-    reshape(v_tiling, v_tiling_buf, K_V_MAX);
+    reshape(k_tiling, k_tiling_buf, s*HEAD_DIM);
+    reshape(v_tiling, v_tiling_buf, s*HEAD_DIM);
 
     compute_attn(x_buf, bias_tiling_q_buf, bias_tiling_k_buf, bias_tiling_v_buf,
                 w_tiling_q_buf, w_tiling_k_buf, w_tiling_v_buf,
@@ -289,8 +268,8 @@ void krnl_attn(float* x, float* w_tiling_q, float* w_tiling_k, float* w_tiling_v
                 s, iter, host_wi, out_buf, cur_k_buf, cur_v_buf);
 
     store_result(out_buf, out, out_size);
-    store_result(cur_k_buf, cur_k, K_V_MAX); // 存12次
-    store_result(cur_v_buf, cur_v, K_V_MAX); // 存12次
+    store_result(cur_k_buf, cur_k, cache_out_size); // 存12次
+    store_result(cur_v_buf, cur_v, cache_out_size); // 存12次
 
 }
 }
