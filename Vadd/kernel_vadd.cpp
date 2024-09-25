@@ -40,9 +40,9 @@ void krnl_vadd(float* in1, float* in2, float* out, int size) {
 #pragma HLS INTERFACE m_axi port = in1 offset = slave bundle = gmem0 depth = 4096 max_read_burst_length = 256
 #pragma HLS INTERFACE m_axi port = in2 offset = slave bundle = gmem1 depth = 4096 max_read_burst_length = 256
 #pragma HLS INTERFACE m_axi port = out offset = slave bundle = gmem2 depth = 4096 max_read_burst_length = 256
-#pragma HLS INTERFACE s_axilite port=in1 bundle=control
-#pragma HLS INTERFACE s_axilite port=in2 bundle=control
-#pragma HLS INTERFACE s_axilite port=out bundle=control
+// #pragma HLS INTERFACE s_axilite port=in1 bundle=control
+// #pragma HLS INTERFACE s_axilite port=in2 bundle=control
+// #pragma HLS INTERFACE s_axilite port=out bundle=control
 
     static hls::stream<float> in1_stream("input_stream_1");
     static hls::stream<float> in2_stream("input_stream_2");
