@@ -63,7 +63,7 @@ void upd_kv_cache(float* cur_k, float* cur_v, int block, int s, int head) {
 }
 int main() {
     // read q, k into a single 1d array
-    for (int iter = 0; iter < 2; iter++) {
+    for (int iter = 0; iter < 1; iter++) {
         int cnt_w = 0;
         int cnt_b = 0;
         int cnt_x = 0;

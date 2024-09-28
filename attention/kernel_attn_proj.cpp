@@ -1,6 +1,7 @@
 // Includes
 #include <stdint.h>
 #include <hls_math.h>
+#include <hls_half.h>
 
 #define S_MAX 128
 #define EMB 768
@@ -43,19 +44,22 @@ init_c_proj:
         for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
             out_buf[i*EMB + j] = c_proj_bias_buf[j];
         }
     }
 compute_c_proj:
     for (int k = 0; k<NUM_HEAD; k++) {
         for (int i = 0; i<s; i++) {
-            int idx_o = i*EMB;
             for (int m = 0; m<HEAD_DIM; m++) {
-                int qkv_idx = k*s*HEAD_DIM + i*HEAD_DIM + m;
-                float qkv_res_buf_tmp = qkv_res_buf[qkv_idx];
+                
                 for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
+                int idx_o = i*EMB;
+                int qkv_idx = k*s*HEAD_DIM + i*HEAD_DIM + m;
+                float qkv_res_buf_tmp = qkv_res_buf[qkv_idx];
                     int weight_idx = (k*HEAD_DIM + m)*EMB + j;
                     out_buf[idx_o + j] += qkv_res_buf_tmp * c_proj_weight_buf[weight_idx];
                 }
@@ -70,7 +74,7 @@ static void store_result(float* buf, float* out, int size) {
 mem_wr:
     for (int i = 0; i < size; i++) {
 #pragma HLS PIPELINE II=1
-        out[i] = buf[i];
+        out[i] = static_cast<half>(buf[i]);
     }
 }
 
