@@ -5,28 +5,71 @@
 #include <string>
 #include <iomanip>
 
-std::vector<std::vector<double>> loadWeights(const std::string& filename, int embedding_size) {
-    std::ifstream file(filename);
-    std::vector<std::vector<double>> weights;
-    std::string line;
-    
-    // Ignore the first line (header)
-    std::getline(file, line); 
-    
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::vector<double> row;
-        std::string value;
-        
-        while (std::getline(ss, value, ',')) {
-            row.push_back(std::stod(value));
+// Function to load 1D weights from a txt file and reshape them into 2D
+std::vector<float> load1DWeights(const std::string& filePath) {
+    std::vector<float> weights;
+    std::ifstream inFile(filePath);
+
+    if (inFile.is_open()) {
+        float value;
+        while (inFile >> value) { // Read each value into the vector
+            weights.push_back(value);
         }
-        
-        weights.push_back(row);
+        inFile.close();
+    } else {
+        std::cerr << "Unable to open file " << filePath << std::endl;
     }
-    
+
     return weights;
 }
+
+std::vector<std::vector<float>> loadWeightsFromTXT(const std::string& filePath, int rows, int cols) {
+    std::vector<float> flat_weights = load1DWeights(filePath);
+    std::vector<std::vector<float>> reshaped_weights(rows, std::vector<float>(cols));
+
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            reshaped_weights[i][j] = flat_weights[i * cols + j];
+        }
+    }
+
+    return reshaped_weights;
+}
+
+// Function to save result as a flat 1D array in output.txt
+void saveToTXT(const std::vector<std::vector<float>>& data, const std::string& filePath) {
+    std::ofstream outFile(filePath);
+    if (outFile.is_open()) {
+        outFile << std::fixed << std::setprecision(13); // Set fixed-point and precision to 13
+        for (const auto& row : data) {
+            for (const auto& value : row) {
+                outFile << value << "\n"; // Write each value on a new line
+            }
+        }
+        outFile.close();
+    } else {
+        std::cerr << "Unable to open file " << filePath << std::endl;
+    }
+}
+
+std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_input, 
+                                             const std::vector<std::vector<float>>& wte, 
+                                             const std::vector<std::vector<float>>& wpe) {
+    int embedding_size = wte[0].size();
+    int sequence_length = tokenized_input.size();
+    
+    std::vector<std::vector<float>> result(sequence_length, std::vector<float>(embedding_size, 0.0f));
+
+    for (int i = 0; i < sequence_length; ++i) {
+        int token_id = tokenized_input[i];
+        for (int j = 0; j < embedding_size; ++j) {
+            result[i][j] = wte[token_id][j] + wpe[i][j];
+        }
+    }
+    
+    return result;
+}
+
 std::vector<int> readTokenizedInput(const std::string& filename) {
     std::vector<int> tokenized_input;
     std::ifstream file(filename);
@@ -47,41 +90,4 @@ std::vector<int> readTokenizedInput(const std::string& filename) {
     }
 
     return tokenized_input;
-}
-
-std::vector<std::vector<double>> sumWPEAndWTE(const std::vector<int>& tokenized_input, 
-                                             const std::vector<std::vector<double>>& wte, 
-                                             const std::vector<std::vector<double>>& wpe) {
-    int embedding_size = wte[0].size();
-    int sequence_length = tokenized_input.size();
-    
-    std::vector<std::vector<double>> result(sequence_length, std::vector<double>(embedding_size, 0.0f));
-
-    for (int i = 0; i < sequence_length; ++i) {
-        int token_id = tokenized_input[i];
-        for (int j = 0; j < embedding_size; ++j) {
-            result[i][j] = wte[token_id][j] + wpe[i][j];
-        }
-    }
-    
-    return result;
-}
-
-void saveToCSV(const std::vector<std::vector<double>>& data, const std::string& filename) {
-    std::ofstream file(filename);
-
-    // Set the desired precision for output
-    file << std::fixed << std::setprecision(15); // Adjust the precision value as needed
-
-    for (const auto& row : data) {
-        for (size_t i = 0; i < row.size(); ++i) {
-            file << row[i];
-            if (i < row.size() - 1) {
-                file << ",";
-            }
-        }
-        file << "\n";
-    }
-
-    file.close();
 }
