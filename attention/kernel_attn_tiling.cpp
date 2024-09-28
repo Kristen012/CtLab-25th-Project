@@ -1,6 +1,7 @@
 // Includes
 #include <stdint.h>
 #include <hls_math.h>
+#include <hls_half.h>
 
 #define S_MAX 128
 #define EMB 768
@@ -66,6 +67,7 @@ init_q_attn_cur_k_attn_cur_c_attn:
         for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
             int idx = i*HEAD_DIM + j;
             q_attn[idx] = bias_tiling_q_buf[j];
             cur_k_buf[idx] = bias_tiling_k_buf[j];
@@ -76,11 +78,11 @@ init_q_attn_cur_k_attn_cur_c_attn:
 compute_q_attn_cur_k_attn_cur_c_attn:
     for (int i = 0; i<query_s; i++) {
         for (int k = 0; k<EMB; k++) {
-            // int idx_x = i*EMB + k;
-            float x_buf_tmp = x_buf[i*EMB + k];
             for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
+            float x_buf_tmp = x_buf[i*EMB + k];
                 int idx_w = k*HEAD_DIM + j;
                 int idx_attn = i*HEAD_DIM + j;
                 q_attn[idx_attn] += x_buf_tmp * w_tiling_q_buf[idx_w];
@@ -97,10 +99,11 @@ stack_past_k_v:
         offset = s*HEAD_DIM;
     }
     for (int i = 0; i<query_s; i++) {
-        int idx_i = i*HEAD_DIM;
         for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
+        int idx_i = i*HEAD_DIM;
             int idx_k_v = offset + idx_i + j;
             int idx_cur = idx_i + j;
             k_tiling_buf[idx_k_v] = cur_k_buf[idx_cur];
@@ -108,9 +111,9 @@ stack_past_k_v:
         }
     }
 qk_matmul:
-    int qk_s;
-    if(iter != 0) qk_s = cur_s;
-    else qk_s = s*s;
+    int qk_s = query_s*cur_s;
+    // if(iter != 0) qk_s = cur_s;
+    // else qk_s = s*s;
 init_qk_result:
     for (int i = 0; i<qk_s; i++) {
 #pragma HLS PIPELINE II=1
@@ -120,10 +123,11 @@ init_qk_result:
 compute_qk_result:
     for (int i = 0; i<query_s; i++) {
         for (int j = 0; j<cur_s; j++) {
-            int idx_i = i*cur_s;
             for (int k = 0; k<HEAD_DIM; k++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
+            int idx_i = i*cur_s;
                 int idx_q = i*HEAD_DIM + k;
                 qk_result[idx_i + j] += q_attn[idx_q] * k_tiling_buf[k + j*HEAD_DIM];
             }
@@ -140,6 +144,7 @@ mask:
         for (int i = 0; i<s; i++) {
             for (int j = i+1; j<s; j++) {
 #pragma HLS PIPELINE II=1
+#pragma HLS loop_flatten
 // #pragma HLS UNROLL factor=4
                 qk_result[i*s + j] = -10000000;
             }
@@ -177,11 +182,13 @@ compute_qkv:
     for (int i = 0; i<query_s; i++) {
         for (int k = 0; k<cur_s; k++) {
             // int idx_qk = i*cur_s + k;
-            int idx_v = k*HEAD_DIM;
-            float qk_res_tmp = qk_result[i*cur_s + k];
+            
             for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
+#pragma HLS loop_flatten
+            int idx_v = k*HEAD_DIM;
+            float qk_res_tmp = qk_result[i*cur_s + k];
                 out_buf[qkv_offset + i*HEAD_DIM + j] += qk_res_tmp * v_tiling_buf[idx_v + j];
             }
         }
@@ -194,7 +201,7 @@ static void store_result(float* buf, float* out, int size) {
 mem_wr:
     for (int i = 0; i < size; i++) {
 #pragma HLS PIPELINE II=1
-        out[i] = buf[i];
+        out[i] = static_cast<half>(buf[i]);
     }
 }
 
