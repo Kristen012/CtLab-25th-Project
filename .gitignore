@@ -11,3 +11,4 @@ softmax_test/softmax.exe
 softmax_test/softmax_double.cpp
 softmax_test/softmax_double.exe
 softmax_test/softmax.py
+*.exe

@@ -7,6 +7,7 @@
 #include <limits>
 #include <iomanip>
 #include <numeric>
+#include <sstream>
 
 class TopKLogitsWarper
 {
@@ -63,23 +64,42 @@ private:
     float filter_value;
 };
 
-std::vector<std::vector<float>> load_csv(const std::string &file_path, char delimiter)
+// std::vector<std::vector<float>> load_csv(const std::string &file_path, char delimiter)
+// {
+//     std::ifstream file(file_path);
+//     std::vector<std::vector<float>> data;
+//     std::string line;
+
+//     while (std::getline(file, line))
+//     {
+//         std::stringstream ss(line);
+//         std::string value;
+//         std::vector<float> row;
+
+//         while (std::getline(ss, value, delimiter))
+//         {
+//             row.push_back(std::stof(value));
+//         }
+//         data.push_back(row);
+//     }
+//     return data;
+// }
+
+std::vector<int> load_csv(const std::string &file_path, char delimiter)
 {
     std::ifstream file(file_path);
-    std::vector<std::vector<float>> data;
+    std::vector<int> data;
     std::string line;
 
     while (std::getline(file, line))
     {
         std::stringstream ss(line);
         std::string value;
-        std::vector<float> row;
 
         while (std::getline(ss, value, delimiter))
         {
-            row.push_back(std::stof(value));
+            data.push_back(std::stof(value));
         }
-        data.push_back(row);
     }
     return data;
 }
@@ -138,18 +158,37 @@ std::vector<std::vector<std::vector<float>>> load_csv_1d_to_3d(const std::string
     return data_3d;
 }
 
-void save_tensor_to_file(const std::vector<std::vector<float>> &data, const std::string &file_path)
+// void save_tensor_to_file(const std::vector<std::vector<float>> &data, const std::string &file_path)
+// {
+//     std::ofstream file(file_path);
+//     if (file.is_open())
+//     {
+//         file << std::fixed << std::setprecision(8);
+//         for (const auto &row : data)
+//         {
+//             for (const auto &value : row)
+//             {
+//                 file << value << "\n";
+//             }
+//         }
+//         file.close();
+//         std::cout << "Data saved to " << file_path << " (one number per line)\n";
+//     }
+//     else
+//     {
+//         std::cerr << "Unable to open file: " << file_path << std::endl;
+//     }
+// }
+
+void save_tensor_to_file(const std::vector<int> &data, const std::string &file_path)
 {
     std::ofstream file(file_path);
     if (file.is_open())
     {
         file << std::fixed << std::setprecision(8);
-        for (const auto &row : data)
+        for (const auto &value : data)
         {
-            for (const auto &value : row)
-            {
-                file << value << "\n";
-            }
+            file << value << "\n"; 
         }
         file.close();
         std::cout << "Data saved to " << file_path << " (one number per line)\n";
@@ -159,6 +198,7 @@ void save_tensor_to_file(const std::vector<std::vector<float>> &data, const std:
         std::cerr << "Unable to open file: " << file_path << std::endl;
     }
 }
+
 
 // Function to calculate softmax
 std::vector<float> softmax(const std::vector<float> &scores)
@@ -180,17 +220,34 @@ std::vector<float> softmax(const std::vector<float> &scores)
     return exp_scores;
 }
 
-std::vector<std::vector<float>> extract_last_token_logits(const std::vector<std::vector<std::vector<float>>> &sample_input)
+std::vector<std::vector<float>> extract_last_token_logits(const std::vector<float> &sample_input)
 {
+    int num_tokens = 50257;
     std::vector<std::vector<float>> next_token_logits;
 
-    for (const auto &row : sample_input)
+    if (sample_input.size() >= num_tokens)
     {
-        next_token_logits.push_back(row.back());
+        std::vector<float> last_tokens(sample_input.end() - num_tokens, sample_input.end());
+        next_token_logits.push_back(last_tokens);
+    }
+    else
+    {
+        throw std::runtime_error("Insufficient tokens in sample_input");
     }
 
     return next_token_logits;
 }
+// std::vector<std::vector<float>> extract_last_token_logits(const std::vector<std::vector<std::vector<float>>> &sample_input)
+// {
+//     std::vector<std::vector<float>> next_token_logits;
+
+//     for (const auto &row : sample_input)
+//     {
+//         next_token_logits.push_back(row.back());
+//     }
+
+//     return next_token_logits;
+// }
 
 int get_iteration_number(const std::string &file_path)
 {
@@ -213,4 +270,72 @@ std::string get_file_by_iteration(const std::string &base_file_path, int iterati
     std::string file_path = base_file_path + "_iter_" + std::to_string(iteration) + ".txt";
 
     return file_path;
+}
+
+std::vector<float> load_csv_1d(const std::string &file_path)
+{
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Unable to open file: " + file_path);
+    }
+
+    std::vector<float> data_1d;
+    std::string line;
+
+    while (std::getline(file, line))
+    {
+        float value = std::stof(line);
+        data_1d.push_back(value);   
+    }
+
+    return data_1d;
+}
+
+void sample(std::vector<float>& sample_input, std::vector<int>& input_ids, int iter)
+{
+    // int batch_size = 1;
+    // int embedding_size = 50257;
+    // std::string sample_input_file_path = "/home/fenyu/vlsi/activations/sample_input/iter_1.txt";
+    // int iter = get_iteration_number(sample_input_file_path);
+    // std::cout << "iter: " << iter << std::endl;
+    // // auto sample_input = load_csv_1d_to_3d(sample_input_file_path, batch_size, embedding_size);
+    // auto sample_input = load_csv_1d(sample_input_file_path);
+
+    // Load input_ids data
+    // std::string input_ids_file_path = "";
+    // if (iter == 1)
+    // {
+    //     input_ids_file_path = "/home/fenyu/vlsi/activations/input_ids_before_embedding/iter_1.txt";
+    // }
+    // else
+    // {
+    //     std::string base_file = "sample_output";
+    //     input_ids_file_path = get_file_by_iteration(base_file, iter - 1);
+    // }
+    // auto input_ids = load_csv(input_ids_file_path, ',');
+
+    // std::cout << "sample_input shape: " << sample_input.size() << " x " << sample_input[0].size() << " x " << sample_input[0][0].size() << std::endl;
+    std::cout << "sample_input shape: " << sample_input.size() << std::endl;
+
+    std::vector<std::vector<float>> next_token_logits = extract_last_token_logits(sample_input);
+
+    const int top_k = 40;
+    TopKLogitsWarper topk_warper(top_k);
+    auto scores_processed = topk_warper(next_token_logits);
+
+    std::vector<float> probs = softmax(scores_processed[0]);
+
+    // Get index of the max value
+    auto max_it = std::max_element(probs.begin(), probs.end());
+    int next_token = std::distance(probs.begin(), max_it);
+
+    std::cout << "Next token: " << next_token << std::endl;
+
+    input_ids.push_back(next_token);
+    std::string base_file = "/home/ywtang23/Data/sample_output";
+    std::string file_path = get_file_by_iteration(base_file, iter);
+    save_tensor_to_file(input_ids, file_path);
+
+    return;
 }

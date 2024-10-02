@@ -192,11 +192,11 @@ std::string decode(const std::vector < int > & ids,
     return r;
 }
 
-int main() {
+void Decode(std::vector<int> indices) {
     // Load vocab.json and create the decoder
     std::unordered_map < std::string, int > t2i;
     std::unordered_map < int, std::string > i2t;
-    std::fstream vocab_txt("vocab.txt", std::ios::in);
+    std::fstream vocab_txt("/home/ywtang23/Data/weight/vocab.txt", std::ios::in);
     load_vocab(vocab_txt, & t2i, & i2t);
     // cout << i2t.size() << "  "<< t2i.size() << endl;
     std::unordered_map < uint8_t, wchar_t > b2u;
@@ -221,11 +221,21 @@ int main() {
     // cout << (int) b2u.size()<< endl;
 
     // // Example indices to decode
-    std::vector < int > indices = readIndicesFromCSV("numbers.csv");
+    // std::vector < int > indices = readIndicesFromCSV("output_ids.csv");
     // for(auto x: indices)
     //     printf("%d\n",x);
     // // Output the result
-    std::cout << decode(indices, u2b, i2t) << std::endl;
+    std::cout << "===== Decoded Result =====" << endl;
+    std::string decoded_result = decode(indices, u2b, i2t);
+    std::cout << decoded_result << std::endl;
+    std::ofstream outfile("/home/ywtang23/Data/decoded_output.txt");
+    if (outfile.is_open()) {
+        outfile << decoded_result;
+        outfile.close();
+        std::cout << "Decoded result has been written to decoded_output.txt" << std::endl;
+    } else {
+        std::cerr << "Failed to open the file for writing!" << std::endl;
+    }
 
-    return 0;
+    return;
 }
