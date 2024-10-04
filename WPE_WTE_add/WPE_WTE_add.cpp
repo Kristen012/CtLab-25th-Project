@@ -9,20 +9,31 @@ int main() {
     std::vector<std::vector<float>> wte = loadWeightsFromTXT("transformer.wte.weight.txt", num_wte_tokens, embedding_size);
     std::vector<std::vector<float>> wpe = loadWeightsFromTXT("transformer.wpe.weight.txt", num_wpe_positions, embedding_size);
 
-    // Read tokenized input
-    std::vector<int> tokenized_input = readTokenizedInput("input_ids_before_embedding.txt");
+    // File paths for input files
+    std::vector<std::string> input_files = {
+        ".\\input_ids_before_embedding\\iter_1.txt",
+        ".\\input_ids_before_embedding\\iter_2.txt",
+        ".\\input_ids_before_embedding\\iter_3.txt"
+    };
 
-    // // Print shapes
-    // std::cout << "WTE Shape: [" << wte.size() << ", " << wte[0].size() << "]" << std::endl;
-    // std::cout << "WPE Shape: [" << wpe.size() << ", " << wpe[0].size() << "]" << std::endl;
-    // std::cout << "INPUT Shape: [" << tokenized_input.size() << "]" << std::endl;
-    
-    // // Perform the sum operation between WTE and WPE
-    std::vector<std::vector<float>> result = sumWPEAndWTE(tokenized_input, wte, wpe);
+    // Process each input file
+    int index = 0;
+    for (const auto& input_file : input_files) {
+        // Read tokenized input
+        std::vector<int> tokenized_input = readTokenizedInput(input_file);
 
-    // // Print result shape
-    // std::cout << "Result Shape: [" << result.size() << ", " << result[0].size() << "]" << std::endl;
+        // Perform the sum operation between WTE and WPE
+        // printf("index : %d\n",index);
+        std::vector<std::vector<float>> result = sumWPEAndWTE(tokenized_input, wte, wpe,index);        
 
-    // Save the result to output.txt
-    saveToTXT(result, "output.txt");
+        index+=(int)result.size();
+        // Generate output file name based on input file
+        std::string output_file = input_file.substr(input_file.find_last_of("\\") + 1);
+        output_file = "output_" + output_file; // Example: output_iter_1.txt
+
+        // Save the result to output file
+        saveToTXT(result, output_file);
+    }
+
+    return 0;
 }
