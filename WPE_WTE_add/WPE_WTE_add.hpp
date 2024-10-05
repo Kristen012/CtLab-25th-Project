@@ -54,7 +54,7 @@ void saveToTXT(const std::vector<std::vector<float>>& data, std::vector<float>& 
 
 std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_input, 
                                              const std::vector<std::vector<float>>& wte, 
-                                             const std::vector<std::vector<float>>& wpe) {
+                                             const std::vector<std::vector<float>>& wpe,int index) {
     int embedding_size = wte[0].size();
     int sequence_length = tokenized_input.size();
     
@@ -63,7 +63,7 @@ std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_i
     for (int i = 0; i < sequence_length; ++i) {
         int token_id = tokenized_input[i];
         for (int j = 0; j < embedding_size; ++j) {
-            result[i][j] = wte[token_id][j] + wpe[i][j];
+            result[i][j] = wte[token_id][j] + wpe[index+i][j];
         }
     }
     
