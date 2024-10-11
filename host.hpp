@@ -159,7 +159,7 @@ float *ptr_ll_Data_head1_in, *ptr_ll_Data_head1_weight, *ptr_ll_head1_res;
 
 float *ptr_ll_Data_head2_in, *ptr_ll_Data_head2_weight, *ptr_ll_head2_res;
 
-int s = 127; // TODO
+int s; // TODO
 
 int kv_inner = 768432;
 
@@ -171,8 +171,8 @@ vector<float> v_tmp(kv_inner);
 // float LL_RES[128 * DATA_SIZE_LAST_LINEAR_WEIGHT_WIDTH]; // 128 * N0 * N1
 
 int idx_cache = 0;
-vector<int> Array_tokenization_out(1024);
-extern vector<float> Array_ln_Data_in1(LN_DATA_SIZE);
+vector<int> Array_tokenization_out(128);
+vector<float> Array_ln_Data_in1(LN_DATA_SIZE);
 vector<vector<float>> Array_ln_Data_g(num_block);
 vector<vector<float>> Array_ln_Data_b(num_block);
 vector<vector<float>> Array_attn_Data_w_tiling(num_block);
@@ -192,7 +192,8 @@ vector<float> LL_RES(128 * DATA_SIZE_LAST_LINEAR_WEIGHT_WIDTH);
 
 vector<float> host_result(768*128);
 vector<float> host_result_ll(50257*128);
-
+vector<vector<float>> wte;
+vector<vector<float>> wpe;
 
 // float Array_ln_Data_in1;
 // float **Array_ln_Data_g;
@@ -263,6 +264,36 @@ void upd_kv_cache(float* cur_k, float* cur_v, int block, int head, int iter) {
 
 }
 
+std::vector<float> load1DWeights(const std::string& filePath) {
+    std::vector<float> weights;
+    std::ifstream inFile(filePath);
+
+    if (inFile.is_open()) {
+        float value;
+        while (inFile >> value) { // Read each value into the vector
+            weights.push_back(value);
+        }
+        inFile.close();
+    } else {
+        std::cerr << "Unable to open file " << filePath << std::endl;
+    }
+
+    return weights;
+}
+
+std::vector<std::vector<float>> loadWeightsWTEWPE(const std::string& filePath, int rows, int cols) {
+    std::vector<float> flat_weights = load1DWeights(filePath);
+    std::vector<std::vector<float>> reshaped_weights(rows, std::vector<float>(cols));
+
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            reshaped_weights[i][j] = flat_weights[i * cols + j];
+        }
+    }
+
+    return reshaped_weights;
+}
+
 void read_file(string path, vector<float>& Array) {
 	ifstream infile;
 	string full_path = "/home/ywtang23/Data/weight/";
@@ -330,6 +361,8 @@ void open_file() {
 	read_file("transformer.ln_f.weight.txt", Array_lnf_Data_g);
 	read_file("transformer.ln_f.bias.txt", Array_lnf_Data_b);
 	read_file("linear_weight_new.txt", Array_last_linear_w);
+    wte = loadWeightsWTEWPE("/home/ywtang23/Data/weight/transformer.wte.weight.txt", 50257, 768);
+    wpe = loadWeightsWTEWPE("/home/ywtang23/Data/weight/transformer.wpe.weight.txt", 1024, 768);
 }
 
 void dataPrepare(float *ptr, vector<float>& Array,  int Nb_Of_Elements, enum DATA data, int host_wi, int s, int iter, int block) {
@@ -385,7 +418,7 @@ void dataPrepare(float *ptr, vector<float>& Array,  int Nb_Of_Elements, enum DAT
 			}
 			else {
 				for (int i = 0; i<s*64; i++) {
-					ptr[i] = Array[host_wi*(s+1)*64 + i];
+					ptr[i] = k_cache[block][host_wi*(s+1)*64 + i];
 				}
 			}
 			break;
@@ -398,7 +431,7 @@ void dataPrepare(float *ptr, vector<float>& Array,  int Nb_Of_Elements, enum DAT
 			}
 			else {
 				for (int i = 0; i<s*64; i++) {
-					ptr[i] = Array[host_wi*(s+1)*64 + i];
+					ptr[i] = v_cache[block][host_wi*(s+1)*64 + i];
 				}
 			}
 			break;
@@ -423,12 +456,13 @@ void dataPrepare_tiling(float *Array_tiling, vector<float>& Array_origin, int Nb
 		}
 	}
 }
-void host_res_prepare(vector<float>& Array, int Nb_Of_Elements, int flag) {
+void host_res_prepare(vector<float>& Array, int Nb_Of_Elements, int flag, int iter) {
     ifstream infile;
 	string path;
-	if(flag <= 12) path = "/home/ywtang23/Data/activation/layer_out_iter_1_block_" + to_string(flag) + ".txt";
-	else if(flag == 13) path = "/home/ywtang23/Data/activation/lnf_out_iter_1.txt";
-	else if(flag == 14) path = "/home/ywtang23/Data/activation/linear_output.txt";
+	if(flag <= 12) path = "/home/ywtang23/Data/activation/layer_out_iter_" + to_string(iter+1) + "_block_" + to_string(flag) + ".txt";
+	else if(flag == 13) path = "/home/ywtang23/Data/activation/lnf_out_iter_" + to_string(iter+1) + ".txt";
+	else if(flag == 14) path = "/home/ywtang23/Data/activation/linear_output_iter_" + to_string(iter+1) + ".txt";
+	else if(flag == 15) path = "/home/ywtang23/Data/activation/qkv_iter_" + to_string(iter+1) + "_block_1.txt";
 	infile.open(path);
 
 	std::string line;

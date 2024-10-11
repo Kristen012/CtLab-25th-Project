@@ -412,27 +412,38 @@ int main(int argc, char* argv[]) {
 
     cl::Event event1, event2;
 
-    host_res_prepare(host_result_ll, 50257*127, 14);
 
-    vector<float> Array_ln_Data_in1;
-    WPE_WTE_add(Array_ln_Data_in1);
+    // vector<float> Array_ln_Data_in1;
+    int next_token;
+    vector<int> Array_next_token(1);
+    // WPE_WTE_add(Array_ln_Data_in1);
     // if (!Array_ln_Data_in1.empty()) {
     //     std::cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << std::endl;
     // } else {
     //     std::cerr << "Array_ln_Data_in1 is empty after WPE_WTE_add" << std::endl;
     // }
-    cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;;
-    for (int iter = 0; iter < 1; iter++) {
+    s = Array_tokenization_out.size();
+    cout << "===== input len: " << s << " =====" << endl;
+    for (int iter = 0; iter < 100; iter++) {
+        if(iter > 1) s += 1;
+        int query_s = (iter != 0) ? 1 : s;
+        cout << "===== ITER" << iter << "=====" << endl;
+        Array_ln_Data_in1.clear();
+        if(iter == 0) {
+            WPE_WTE_add(Array_tokenization_out, Array_ln_Data_in1, 0);
+            cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;
+        }
+        else {
+            cout << "get next token: " << next_token << endl;
+            Array_next_token[0] = next_token;
+            WPE_WTE_add(Array_next_token, Array_ln_Data_in1, s);
+            cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;
+        }
         /*-- ptr_ln_Data_in1 --*/
-        #ifdef ALL_MESSAGES
-        cout << "HOST-Info: Generating buffer_ln_Data_in1 ..." << endl;
-        #endif
-        dataPrepare(ptr_ln_Data_in1, Array_ln_Data_in1, LN_DATA_WIDTH*s, ln_Data_in1, -1, s, iter, -1);
+        dataPrepare(ptr_ln_Data_in1, Array_ln_Data_in1, LN_DATA_WIDTH*query_s, ln_Data_in1, -1, s, iter, -1);
         cout << "ptr_ln_Data_in1: " << ptr_ln_Data_in1[0] << " " << ptr_ln_Data_in1[1] << endl;
 
         // int block = 0;
-        if(iter > 1) s += 1;
-        int query_s = (iter != 0) ? 1 : s;
         for (int block = 0; block < 12; block++) {
             /*-- ptr_ln_Data_g --*/
             dataPrepare(ptr_ln_Data_g, Array_ln_Data_g[block], LN_DATA_WIDTH, ln_Data_g, -1, s, iter, block);
@@ -486,10 +497,10 @@ int main(int argc, char* argv[]) {
                 cout << "bias_tiling_v: " << ptr_attn_Data_bias_tiling_v[0] << " " << ptr_attn_Data_bias_tiling_v[1] << endl;
 
                 dataPrepare(ptr_attn_Data_k_tiling, k_cache[block], DATA_SIZE_ATTN_CACHE_TILED, attn_Data_k_tiling, host_wi, s, iter, block);
-                cout << "k_tiling: " << ptr_attn_Data_k_tiling[0] << " " << ptr_attn_Data_k_tiling[1] << endl;
+                cout << "block" << block << ": k_tiling: " << ptr_attn_Data_k_tiling[0] << " " << ptr_attn_Data_k_tiling[1] << endl;
 
                 dataPrepare(ptr_attn_Data_v_tiling, v_cache[block], DATA_SIZE_ATTN_CACHE_TILED, attn_Data_v_tiling, host_wi, s, iter, block);
-                cout << "v_tiling: " << ptr_attn_Data_v_tiling[0] << " " << ptr_attn_Data_v_tiling[1] << endl;
+                cout << "block" << block << ": v_tiling: " << ptr_attn_Data_v_tiling[0] << " " << ptr_attn_Data_v_tiling[1] << endl;
 
                 OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_Data_ln_out, buffer_Data_attn_w_tiling_q, buffer_Data_attn_w_tiling_k, buffer_Data_attn_w_tiling_v, buffer_Data_attn_bias_tiling_q, buffer_Data_attn_bias_tiling_k, buffer_Data_attn_bias_tiling_v, buffer_Data_attn_k_tiling, buffer_Data_attn_v_tiling}, 0 /* 0 means from host*/));
 
@@ -515,9 +526,41 @@ int main(int argc, char* argv[]) {
                 OCL_CHECK(err, q.enqueueMigrateMemObjects({buffer_attn_qkv_result, buffer_attn_cur_k, buffer_attn_cur_v}, CL_MIGRATE_MEM_OBJECT_HOST));
                 OCL_CHECK(err, q.finish());
 
-                upd_kv_cache(ptr_attn_cur_k, ptr_attn_cur_v, 0, host_wi, iter);
+                // cout << "ptr_attn_cur_k: " << ptr_attn_cur_k[0] << " " << ptr_attn_cur_k[1] << endl;
+                upd_kv_cache(ptr_attn_cur_k, ptr_attn_cur_v, block, host_wi, iter);
             }
-
+            // if(iter == 0) {
+            //     cout << "======= KV CACHE" << iter << "block: " << block << " ======="<< endl;
+            //     for (int j = 0; j<s*64*12; j++) {
+            //         cout << j << ": " << k_cache[block][j] << endl;
+            //     }
+            // }
+            // if(iter == 1 && block == 0) {
+            //     host_res_prepare(host_result, query_s*768, 15, iter);
+            //     cout << "======= QKV RES =======" << endl;
+            //     float max_err = abs(host_result[0] - ptr_attn_qkv_result[0]);
+            //     float maxe_host = host_result[0];
+            //     float maxe_ptr = ptr_attn_qkv_result[0];
+            //     for (int i = 0; i < 768*query_s; i++) {
+            //         if(abs(host_result[i] - ptr_attn_qkv_result[i]) > 0.001)
+            //             cout << i << " host_result: " << host_result[i] << " ptr_result: " << ptr_attn_qkv_result[i] << endl;
+            //         if(abs(host_result[i] - ptr_attn_qkv_result[i]) > max_err) {
+            //             max_err = abs(host_result[i] - ptr_attn_qkv_result[i]);
+            //             maxe_host = host_result[i];
+            //             maxe_ptr = ptr_attn_qkv_result[i];
+            //         }
+            //     }
+            //     float cnt = 0;
+            //     int cnt_0 = 0;
+            //     for (int i = 0; i<768*query_s; i++) {
+            //         if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_attn_qkv_result[i])/host_result[i]));
+            //         else cnt_0++;
+            //     }
+            //     cout << cnt << endl;
+            //     cnt /= (768*query_s-cnt_0);
+            //     cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+            //     cout << "max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
+            // }
             dataPrepare(ptr_attn_Data_c_proj_weight, Array_attn_Data_c_proj_weight[block], DATA_SIZE_C_PROJ_WEIGHT, attn_Data_c_proj_weight, -1, s, iter, block);
             cout << "c_proj_weight: " << ptr_attn_Data_c_proj_weight[0] << " " << ptr_attn_Data_c_proj_weight[1] << endl;
 
@@ -638,30 +681,30 @@ int main(int argc, char* argv[]) {
             OCL_CHECK(err, q.enqueueMigrateMemObjects({buffer_layer_out}, CL_MIGRATE_MEM_OBJECT_HOST));
             OCL_CHECK(err, q.finish());
 
-            host_res_prepare(host_result, query_s*768, block+1);
-            cout << "=======Layer_RES" << block << "=======" << endl;
-            float max_err = abs(host_result[0] - ptr_layer_out[0]);
-            float maxe_host = host_result[0];
-            float maxe_ptr = ptr_layer_out[0];
-            for (int i = 0; i < 768*query_s; i++) {
-                // if(abs(host_result[i] - ptr_layer_out[i]) > 0.001)
-                //     cout << i << " " << host_result[i] << " " << ptr_layer_out[i] << endl;
-                if(abs(host_result[i] - ptr_layer_out[i]) > max_err) {
-                    max_err = abs(host_result[i] - ptr_layer_out[i]);
-                    maxe_host = host_result[i];
-                    maxe_ptr = ptr_layer_out[i];
-                }
-            }
-            float cnt = 0;
-            int cnt_0 = 0;
-            for (int i = 0; i<768*query_s; i++) {
-                if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_layer_out[i])/host_result[i]));
-                else cnt_0++;
-            }
-            cout << cnt << endl;
-            cnt /= (768*query_s-cnt_0);
-            cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
-            cout << "max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
+            // host_res_prepare(host_result, query_s*768, block+1, iter);
+            // cout << "=======Layer_RES" << block << "=======" << endl;
+            // float max_err = abs(host_result[0] - ptr_layer_out[0]);
+            // float maxe_host = host_result[0];
+            // float maxe_ptr = ptr_layer_out[0];
+            // for (int i = 0; i < 768*query_s; i++) {
+            //     // if(abs(host_result[i] - ptr_layer_out[i]) > 0.001)
+            //     //     cout << i << " " << host_result[i] << " " << ptr_layer_out[i] << endl;
+            //     if(abs(host_result[i] - ptr_layer_out[i]) > max_err) {
+            //         max_err = abs(host_result[i] - ptr_layer_out[i]);
+            //         maxe_host = host_result[i];
+            //         maxe_ptr = ptr_layer_out[i];
+            //     }
+            // }
+            // float cnt = 0;
+            // int cnt_0 = 0;
+            // for (int i = 0; i<768*query_s; i++) {
+            //     if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_layer_out[i])/host_result[i]));
+            //     else cnt_0++;
+            // }
+            // cout << cnt << endl;
+            // cnt /= (768*query_s-cnt_0);
+            // cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+            // cout << "max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
         }
 
         dataPrepare(ptr_ln_Data_g, Array_lnf_Data_g, LN_DATA_WIDTH, lnf_Data_g, -1, s, iter, -1);
@@ -691,32 +734,32 @@ int main(int argc, char* argv[]) {
         OCL_CHECK(err, q.enqueueMigrateMemObjects({buffer_Data_ln_out}, CL_MIGRATE_MEM_OBJECT_HOST));
         OCL_CHECK(err, q.finish());
 
-        host_res_prepare(host_result, query_s*768, 13);
-        cout << "=======LN_RES=======" << endl;
-        float max_err = abs(host_result[0] - ptr_ln_out[0]);
-        float maxe_host = host_result[0];
-        float maxe_ptr = ptr_ln_out[0];
-        int maxe_idx = 0;
-        for (int i = 0; i < 768*query_s; i++) {
-            // if(abs(host_result[i] - ptr_ln_out[i]) > 0.001)
-            //     cout << i << " " << host_result[i] << " " << ptr_ln_out[i] << endl;
-            if(abs(host_result[i] - ptr_ln_out[i]) > max_err) {
-                max_err = abs(host_result[i] - ptr_ln_out[i]);
-                maxe_host = host_result[i];
-                maxe_ptr = ptr_ln_out[i];
-                maxe_idx = i;
-            }
-        }
-        float cnt = 0;
-        int cnt_0 = 0;
-        for (int i = 0; i<768*query_s; i++) {
-            if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_ln_out[i])/host_result[i]));
-            else cnt_0++;
-        }
-        cout << cnt << endl;
-        cnt /= (768*query_s-cnt_0);
-        cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
-        cout << "i: " << maxe_idx << " max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
+        // host_res_prepare(host_result, query_s*768, 13, iter);
+        // cout << "=======LN_RES=======" << endl;
+        // float max_err = abs(host_result[0] - ptr_ln_out[0]);
+        // float maxe_host = host_result[0];
+        // float maxe_ptr = ptr_ln_out[0];
+        // int maxe_idx = 0;
+        // for (int i = 0; i < 768*query_s; i++) {
+        //     // if(abs(host_result[i] - ptr_ln_out[i]) > 0.001)
+        //     //     cout << i << " " << host_result[i] << " " << ptr_ln_out[i] << endl;
+        //     if(abs(host_result[i] - ptr_ln_out[i]) > max_err) {
+        //         max_err = abs(host_result[i] - ptr_ln_out[i]);
+        //         maxe_host = host_result[i];
+        //         maxe_ptr = ptr_ln_out[i];
+        //         maxe_idx = i;
+        //     }
+        // }
+        // float cnt = 0;
+        // int cnt_0 = 0;
+        // for (int i = 0; i<768*query_s; i++) {
+        //     if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_ln_out[i])/host_result[i]));
+        //     else cnt_0++;
+        // }
+        // cout << cnt << endl;
+        // cnt /= (768*query_s-cnt_0);
+        // cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+        // cout << "i: " << maxe_idx << " max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
 
         int ll_depth_size = 0;
         int ll_error_flag = 0;
@@ -726,9 +769,9 @@ int main(int argc, char* argv[]) {
         double total_execution_time_kernel2 = 0.0;
         double total_overlap_time = 0.0;
 
-        for (int i = 0; i<s; i += DATA_SIZE_LL_MAX_DEPTH) {
-            if(s - i < DATA_SIZE_LL_MAX_DEPTH) {
-                ll_depth_size = s - i;
+        for (int i = 0; i<query_s; i += DATA_SIZE_LL_MAX_DEPTH) {
+            if(query_s - i < DATA_SIZE_LL_MAX_DEPTH) {
+                ll_depth_size = query_s - i;
             }
             else {
                 ll_depth_size = DATA_SIZE_LL_MAX_DEPTH;
@@ -738,11 +781,11 @@ int main(int argc, char* argv[]) {
 
             for (int j = 0; j<N1; j += 2) {
 
-                vector<float> ptr_ln_out_vec(ptr_ln_out, ptr_ln_out + s*768);
-                for (int i = 0; i<s*768; i++) {
-                    if(ptr_ln_out[i] != ptr_ln_out_vec[i])
-                        cout << "ptr_ln_out: " << ptr_ln_out[i] << " ptr_ln_out_vec: " << ptr_ln_out_vec[i] << endl;
-                }
+                vector<float> ptr_ln_out_vec(ptr_ln_out, ptr_ln_out + query_s*768);
+                // for (int i = 0; i<query_s*768; i++) {
+                //     if(ptr_ln_out[i] != ptr_ln_out_vec[i])
+                //         cout << "ptr_ln_out: " << ptr_ln_out[i] << " ptr_ln_out_vec: " << ptr_ln_out_vec[i] << endl;
+                // }
                 dataPrepare_tiling(ptr_ll_Data_head1_in, ptr_ln_out_vec, ll_depth_size*K0, 1, j, i);
 
                 dataPrepare_tiling(ptr_ll_Data_head1_weight, Array_last_linear_w, K0*N0, 2, j, i);
@@ -791,16 +834,16 @@ int main(int argc, char* argv[]) {
                             if (h == 0) {
                                 LL_RES[i * 50257 + j * N0 + d * 50257 + k] = ptr_ll_head1_res[d * N0 + k];
                                 if (abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) > 0.5) {
-                                    cout << "i: " << i << ", j: " << j << ", k: " << k << ", kernel: " <<  ptr_ll_head1_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + j * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) << endl;
-                                    ll_error_flag = 1;
+                                    // cout << "i: " << i << ", j: " << j << ", k: " << k << ", kernel: " <<  ptr_ll_head1_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + j * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) << endl;
+                                    // ll_error_flag = 1;
                                     // break;
                                 }
                             }
                             else if (h == 1) {
                                 LL_RES[i * 50257 + (j + 1) * N0 + d * 50257 + k] = ptr_ll_head2_res[d * N0 + k];
                                 if (abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) > 0.5) {
-                                    cout << "i: " << i << ", j: " << (j + 1) << ", k: " << k << ", kernel: " <<  ptr_ll_head2_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) << endl;
-                                    ll_error_flag = 1;
+                                    // cout << "i: " << i << ", j: " << (j + 1) << ", k: " << k << ", kernel: " <<  ptr_ll_head2_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) << endl;
+                                    // ll_error_flag = 1;
                                     // break;
                                 }
                             }
@@ -819,39 +862,40 @@ int main(int argc, char* argv[]) {
         cout << "Parallel execution time: " << parallel_execution_time << " ms" << endl;
 
         // TODO: check result
-        cout << "=======LL_RES=======" << endl;
-        max_err = abs(host_result_ll[0] - LL_RES[0]);
-        maxe_host = host_result_ll[0];
-        maxe_ptr = LL_RES[0];
-        maxe_idx = 0;
-        for (int i = 0; i < 50257*s; i++) {
-            // if(abs(host_result_ll[i] - LL_RES[i]) > 0.01)
-            //     cout << i << " " << host_result_ll[i] << " " << LL_RES[i] << endl;
-            if(abs(host_result_ll[i] - LL_RES[i]) > max_err) {
-                max_err = abs(host_result_ll[i] - LL_RES[i]);
-                maxe_host = host_result_ll[i];
-                maxe_ptr = LL_RES[i];
-                maxe_idx = i;
-            }
-        }
-        cnt = 0;
-        cnt_0 = 0;
-        for (int i = 0; i<50257*s; i++) {
-            if(host_result_ll[i] != 0) cnt += abs((abs(host_result_ll[i] - LL_RES[i])/host_result_ll[i]));
-            else cnt_0++;
-        }
-        cout << cnt << endl;
-        cnt /= (50257*127-cnt_0);
-        cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
-        cout << "i: " << maxe_idx << " max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
+        // cout << "=======LL_RES=======" << endl;
+        // host_res_prepare(host_result_ll, 50257*query_s, 14, iter);
+        // max_err = abs(host_result_ll[0] - LL_RES[0]);
+        // maxe_host = host_result_ll[0];
+        // maxe_ptr = LL_RES[0];
+        // maxe_idx = 0;
+        // for (int i = 0; i < 50257*query_s; i++) {
+        //     // if(abs(host_result_ll[i] - LL_RES[i]) > 0.01)
+        //     //     cout << i << " " << host_result_ll[i] << " " << LL_RES[i] << endl;
+        //     if(abs(host_result_ll[i] - LL_RES[i]) > max_err) {
+        //         max_err = abs(host_result_ll[i] - LL_RES[i]);
+        //         maxe_host = host_result_ll[i];
+        //         maxe_ptr = LL_RES[i];
+        //         maxe_idx = i;
+        //     }
+        // }
+        // cnt = 0;
+        // cnt_0 = 0;
+        // for (int i = 0; i<50257*query_s; i++) {
+        //     if(host_result_ll[i] != 0) cnt += abs((abs(host_result_ll[i] - LL_RES[i])/host_result_ll[i]));
+        //     else cnt_0++;
+        // }
+        // cout << cnt << endl;
+        // cnt /= (50257*127-cnt_0);
+        // cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+        // cout << "i: " << maxe_idx << " max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
 
-        vector<float> sample_in(50257*s);
+        vector<float> sample_in(50257*query_s);
         for(size_t i = 0; i<sample_in.size(); i++) {
             sample_in[i] = LL_RES[i];
         }
 
         // cout << "Array_tokenization_out: " << Array_tokenization_out[0] << " " << Array_tokenization_out[1] << " " << Array_tokenization_out[2] << endl;
-        sample(sample_in, Array_tokenization_out, iter);
+        next_token = sample(sample_in, Array_tokenization_out, iter);
     }
     Decode(Array_tokenization_out);
     // ============================================================================

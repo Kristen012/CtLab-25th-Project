@@ -234,7 +234,7 @@ void Decode(std::vector<int> indices) {
         outfile.close();
         std::cout << "Decoded result has been written to decoded_output.txt" << std::endl;
     } else {
-        std::cerr << "Failed to open the file for writing!" << std::endl;
+        std::cerr << "Failed to open the file for writing" << std::endl;
     }
 
     return;

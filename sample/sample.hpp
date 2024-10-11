@@ -180,24 +180,24 @@ std::vector<std::vector<std::vector<float>>> load_csv_1d_to_3d(const std::string
 //     }
 // }
 
-void save_tensor_to_file(const std::vector<int> &data, const std::string &file_path)
-{
-    std::ofstream file(file_path);
-    if (file.is_open())
-    {
-        file << std::fixed << std::setprecision(8);
-        for (const auto &value : data)
-        {
-            file << value << "\n"; 
-        }
-        file.close();
-        std::cout << "Data saved to " << file_path << " (one number per line)\n";
-    }
-    else
-    {
-        std::cerr << "Unable to open file: " << file_path << std::endl;
-    }
-}
+// void save_tensor_to_file(const std::vector<int> &data, const std::string &file_path)
+// {
+//     std::ofstream file(file_path);
+//     if (file.is_open())
+//     {
+//         file << std::fixed << std::setprecision(8);
+//         for (const auto &value : data)
+//         {
+//             file << value << "\n";
+//         }
+//         file.close();
+//         std::cout << "Data saved to " << file_path << " (one number per line)\n";
+//     }
+//     else
+//     {
+//         std::cerr << "Unable to open file: " << file_path << std::endl;
+//     }
+// }
 
 
 // Function to calculate softmax
@@ -292,7 +292,7 @@ std::vector<float> load_csv_1d(const std::string &file_path)
     return data_1d;
 }
 
-void sample(std::vector<float>& sample_input, std::vector<int>& input_ids, int iter)
+int sample(std::vector<float>& sample_input, std::vector<int>& input_ids, int iter)
 {
     // int batch_size = 1;
     // int embedding_size = 50257;
@@ -333,9 +333,9 @@ void sample(std::vector<float>& sample_input, std::vector<int>& input_ids, int i
     std::cout << "Next token: " << next_token << std::endl;
 
     input_ids.push_back(next_token);
-    std::string base_file = "/home/ywtang23/Data/sample_output";
-    std::string file_path = get_file_by_iteration(base_file, iter);
-    save_tensor_to_file(input_ids, file_path);
+    // std::string base_file = "/home/ywtang23/Data/sample_output";
+    // std::string file_path = get_file_by_iteration(base_file, iter);
+    // save_tensor_to_file(input_ids, file_path);
 
-    return;
+    return next_token;
 }
