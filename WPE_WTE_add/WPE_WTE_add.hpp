@@ -35,14 +35,14 @@ std::vector<std::vector<float>> loadWeightsFromTXT(const std::string& filePath, 
 
     return reshaped_weights;
 }
+
 // Function to save result as a flat 1D array in output.txt
-void saveToTXT(const std::vector<std::vector<float>>& data, std::vector<float>& Array_ln_Data_in1, const std::string& filePath) {
+void saveToTXT(const std::vector<std::vector<float>>& data, const std::string& filePath) {
     std::ofstream outFile(filePath);
     if (outFile.is_open()) {
         outFile << std::fixed << std::setprecision(13); // Set fixed-point and precision to 13
         for (const auto& row : data) {
             for (const auto& value : row) {
-                Array_ln_Data_in1.push_back(value);
                 outFile << value << "\n"; // Write each value on a new line
             }
         }
@@ -90,30 +90,4 @@ std::vector<int> readTokenizedInput(const std::string& filename) {
     }
 
     return tokenized_input;
-}
-void WPE_WTE_add(std::vector<float>& Array_ln_Data_in1) {
-    int embedding_size = 768;
-    int num_wte_tokens = 50257;
-    int num_wpe_positions = 1024;
-
-    // Load weights from the txt files (now 1D and reshaped into 2D)
-    std::vector<std::vector<float>> wte = loadWeightsFromTXT("/home/ywtang23/Data/weight/transformer.wte.weight.txt", num_wte_tokens, embedding_size);
-    std::vector<std::vector<float>> wpe = loadWeightsFromTXT("/home/ywtang23/Data/weight/transformer.wpe.weight.txt", num_wpe_positions, embedding_size);
-
-    // Read tokenized input
-    std::vector<int> tokenized_input = readTokenizedInput("/home/ywtang23/Data/activation/input_ids_before_embedding.txt");
-
-    // // Print shapes
-    // std::cout << "WTE Shape: [" << wte.size() << ", " << wte[0].size() << "]" << std::endl;
-    // std::cout << "WPE Shape: [" << wpe.size() << ", " << wpe[0].size() << "]" << std::endl;
-    // std::cout << "INPUT Shape: [" << tokenized_input.size() << "]" << std::endl;
-    
-    // // Perform the sum operation between WTE and WPE
-    std::vector<std::vector<float>> tmp_result = sumWPEAndWTE(tokenized_input, wte, wpe);
-
-    // // Print result shape
-    // std::cout << "Result Shape: [" << result.size() << ", " << result[0].size() << "]" << std::endl;
-
-    // Save the result to output.txt
-    saveToTXT(tmp_result, Array_ln_Data_in1, "/home/ywtang23/Data/wwa_output.txt");
 }
