@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <numeric>
 #include <sstream>
+#include <random>
 
 class TopKLogitsWarper
 {
@@ -188,7 +189,7 @@ std::vector<std::vector<std::vector<float>>> load_csv_1d_to_3d(const std::string
 //         file << std::fixed << std::setprecision(8);
 //         for (const auto &value : data)
 //         {
-//             file << value << "\n";
+//             file << value << "\n"; 
 //         }
 //         file.close();
 //         std::cout << "Data saved to " << file_path << " (one number per line)\n";
@@ -327,8 +328,14 @@ int sample(std::vector<float>& sample_input, std::vector<int>& input_ids, int it
     std::vector<float> probs = softmax(scores_processed[0]);
 
     // Get index of the max value
-    auto max_it = std::max_element(probs.begin(), probs.end());
-    int next_token = std::distance(probs.begin(), max_it);
+    // auto max_it = std::max_element(probs.begin(), probs.end());
+    // int next_token = std::distance(probs.begin(), max_it);
+    
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::discrete_distribution<> dist(probs.begin(), probs.end());
+
+    int next_token = dist(gen);
 
     std::cout << "Next token: " << next_token << std::endl;
 
