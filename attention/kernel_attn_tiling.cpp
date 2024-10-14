@@ -182,7 +182,7 @@ compute_qkv:
     for (int i = 0; i<query_s; i++) {
         for (int k = 0; k<cur_s; k++) {
             // int idx_qk = i*cur_s + k;
-            
+
             for (int j = 0; j<HEAD_DIM; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8

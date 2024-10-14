@@ -52,7 +52,7 @@ compute_c_proj:
     for (int k = 0; k<NUM_HEAD; k++) {
         for (int i = 0; i<s; i++) {
             for (int m = 0; m<HEAD_DIM; m++) {
-                
+
                 for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
