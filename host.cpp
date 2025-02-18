@@ -44,6 +44,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "WPE_WTE_add.hpp"
 #include "decode.hpp"
 #include "sample.hpp"
+#include "encode.hpp"
 
 #define OCL_CHECK(error, call)                                                                   \
     do {                                                                                         \
@@ -294,6 +295,7 @@ int main(int argc, char* argv[]) {
     // These commands will allocate memory on the .Device
     // The cl::Buffer objects can be used to reference the memory locations on the device.
 
+
     /*-- ptr_ln_Data_in1 --*/
     #ifdef ALL_MESSAGES
     cout << "HOST-Info: Allocating Memory buffer... " << endl;
@@ -422,24 +424,28 @@ int main(int argc, char* argv[]) {
     // } else {
     //     std::cerr << "Array_ln_Data_in1 is empty after WPE_WTE_add" << std::endl;
     // }
+    total_kv_time = total_decode_time = total_sample_time = total_wwa_time = 0;
+    Array_tokenization_out = encode();
     s = Array_tokenization_out.size();
     cout << "===== input len: " << s << " =====" << endl;
+
     for (int iter = 0; iter < 100; iter++) {
         if(iter > 1) s += 1;
         int query_s = (iter != 0) ? 1 : s;
         cout << "===== ITER" << iter << "=====" << endl;
         Array_ln_Data_in1.clear();
         if(iter == 0) {
-            WPE_WTE_add(Array_tokenization_out, Array_ln_Data_in1, 0);
+            total_wwa_time += WPE_WTE_add(Array_tokenization_out, Array_ln_Data_in1, 0);
             cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;
         }
         else {
             cout << "get next token: " << next_token << endl;
             Array_next_token[0] = next_token;
-            WPE_WTE_add(Array_next_token, Array_ln_Data_in1, s);
-            cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;
+            total_wwa_time += WPE_WTE_add(Array_next_token, Array_ln_Data_in1, s);
+//            cout << "Array_ln_Data_in1: " << Array_ln_Data_in1[0] << " " << Array_ln_Data_in1[1] << endl;
         }
         /*-- ptr_ln_Data_in1 --*/
+        cout << Array_ln_Data_in1.size() << endl;
         dataPrepare(ptr_ln_Data_in1, Array_ln_Data_in1, LN_DATA_WIDTH*query_s, ln_Data_in1, -1, s, iter, -1);
         cout << "ptr_ln_Data_in1: " << ptr_ln_Data_in1[0] << " " << ptr_ln_Data_in1[1] << endl;
 
@@ -447,11 +453,11 @@ int main(int argc, char* argv[]) {
         for (int block = 0; block < 12; block++) {
             /*-- ptr_ln_Data_g --*/
             dataPrepare(ptr_ln_Data_g, Array_ln_Data_g[block], LN_DATA_WIDTH, ln_Data_g, -1, s, iter, block);
-            cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
+//            cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
 
             /*-- ptr_ln_Data_b --*/
             dataPrepare(ptr_ln_Data_b, Array_ln_Data_b[block], LN_DATA_WIDTH, ln_Data_b, -1, s, iter, block);
-            cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
+//            cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
 
             if(block == 0) OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_Data_ln_Data_in1, buffer_Data_ln_Data_g, buffer_Data_ln_Data_b}, 0 /* 0 means from host*/));
             else OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_layer_out, buffer_Data_ln_Data_g, buffer_Data_ln_Data_b}, 0 /* 0 means from host*/));
@@ -477,30 +483,31 @@ int main(int argc, char* argv[]) {
             OCL_CHECK(err, err = q.enqueueTask(layer_norm));
             OCL_CHECK(err, q.enqueueMigrateMemObjects({buffer_Data_ln_out}, CL_MIGRATE_MEM_OBJECT_HOST));
             OCL_CHECK(err, q.finish());
+//            for (int i = 0; i<768; i++) cout << ptr_ln_out[i] << endl;
             for (int host_wi = 0; host_wi<12; host_wi++) {
                 dataPrepare(ptr_attn_Data_w_tiling_q, Array_attn_Data_w_tiling[block], DATA_SIZE_C_ATTN_WEIGHT_TILED, attn_Data_w_tiling_q, host_wi, s, iter, block);
-                cout << "w_tiling_q: " << ptr_attn_Data_w_tiling_q[0] << " " << ptr_attn_Data_w_tiling_q[1] << endl;
+//                cout << "w_tiling_q: " << ptr_attn_Data_w_tiling_q[0] << " " << ptr_attn_Data_w_tiling_q[1] << endl;
 
                 dataPrepare(ptr_attn_Data_w_tiling_k, Array_attn_Data_w_tiling[block], DATA_SIZE_C_ATTN_WEIGHT_TILED, attn_Data_w_tiling_k, host_wi, s, iter, block);
-                cout << "w_tiling_k: " << ptr_attn_Data_w_tiling_k[0] << " " << ptr_attn_Data_w_tiling_k[1] << endl;
+//                cout << "w_tiling_k: " << ptr_attn_Data_w_tiling_k[0] << " " << ptr_attn_Data_w_tiling_k[1] << endl;
 
                 dataPrepare(ptr_attn_Data_w_tiling_v, Array_attn_Data_w_tiling[block], DATA_SIZE_C_ATTN_WEIGHT_TILED, attn_Data_w_tiling_v, host_wi, s, iter, block);
-                cout << "w_tiling_v: " << ptr_attn_Data_w_tiling_v[0] << " " << ptr_attn_Data_w_tiling_v[1] << endl;
+//                cout << "w_tiling_v: " << ptr_attn_Data_w_tiling_v[0] << " " << ptr_attn_Data_w_tiling_v[1] << endl;
 
                 dataPrepare(ptr_attn_Data_bias_tiling_q, Array_attn_Data_bias_tiling[block], DATA_SIZE_C_ATTN_BIAS_TILED, attn_Data_bias_tiling_q, host_wi, s, iter, block);
-                cout << "bias_tiling_q: " << ptr_attn_Data_bias_tiling_q[0] << " " << ptr_attn_Data_bias_tiling_q[1] << endl;
+//                cout << "bias_tiling_q: " << ptr_attn_Data_bias_tiling_q[0] << " " << ptr_attn_Data_bias_tiling_q[1] << endl;
 
                 dataPrepare(ptr_attn_Data_bias_tiling_k, Array_attn_Data_bias_tiling[block], DATA_SIZE_C_ATTN_BIAS_TILED, attn_Data_bias_tiling_k, host_wi, s, iter, block);
-                cout << "bias_tiling_k: " << ptr_attn_Data_bias_tiling_k[0] << " " << ptr_attn_Data_bias_tiling_k[1] << endl;
+//                cout << "bias_tiling_k: " << ptr_attn_Data_bias_tiling_k[0] << " " << ptr_attn_Data_bias_tiling_k[1] << endl;
 
                 dataPrepare(ptr_attn_Data_bias_tiling_v, Array_attn_Data_bias_tiling[block], DATA_SIZE_C_ATTN_BIAS_TILED, attn_Data_bias_tiling_v, host_wi, s, iter, block);
-                cout << "bias_tiling_v: " << ptr_attn_Data_bias_tiling_v[0] << " " << ptr_attn_Data_bias_tiling_v[1] << endl;
+//                cout << "bias_tiling_v: " << ptr_attn_Data_bias_tiling_v[0] << " " << ptr_attn_Data_bias_tiling_v[1] << endl;
 
                 dataPrepare(ptr_attn_Data_k_tiling, k_cache[block], DATA_SIZE_ATTN_CACHE_TILED, attn_Data_k_tiling, host_wi, s, iter, block);
-                cout << "block" << block << ": k_tiling: " << ptr_attn_Data_k_tiling[0] << " " << ptr_attn_Data_k_tiling[1] << endl;
+//                cout << "block" << block << ": k_tiling: " << ptr_attn_Data_k_tiling[0] << " " << ptr_attn_Data_k_tiling[1] << endl;
 
                 dataPrepare(ptr_attn_Data_v_tiling, v_cache[block], DATA_SIZE_ATTN_CACHE_TILED, attn_Data_v_tiling, host_wi, s, iter, block);
-                cout << "block" << block << ": v_tiling: " << ptr_attn_Data_v_tiling[0] << " " << ptr_attn_Data_v_tiling[1] << endl;
+//                cout << "block" << block << ": v_tiling: " << ptr_attn_Data_v_tiling[0] << " " << ptr_attn_Data_v_tiling[1] << endl;
 
                 OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_Data_ln_out, buffer_Data_attn_w_tiling_q, buffer_Data_attn_w_tiling_k, buffer_Data_attn_w_tiling_v, buffer_Data_attn_bias_tiling_q, buffer_Data_attn_bias_tiling_k, buffer_Data_attn_bias_tiling_v, buffer_Data_attn_k_tiling, buffer_Data_attn_v_tiling}, 0 /* 0 means from host*/));
 
@@ -527,7 +534,7 @@ int main(int argc, char* argv[]) {
                 OCL_CHECK(err, q.finish());
 
                 // cout << "ptr_attn_cur_k: " << ptr_attn_cur_k[0] << " " << ptr_attn_cur_k[1] << endl;
-                upd_kv_cache(ptr_attn_cur_k, ptr_attn_cur_v, block, host_wi, iter);
+                total_kv_time += upd_kv_cache(ptr_attn_cur_k, ptr_attn_cur_v, block, host_wi, iter);
             }
             // if(iter == 0) {
             //     cout << "======= KV CACHE" << iter << "block: " << block << " ======="<< endl;
@@ -562,10 +569,10 @@ int main(int argc, char* argv[]) {
             //     cout << "max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
             // }
             dataPrepare(ptr_attn_Data_c_proj_weight, Array_attn_Data_c_proj_weight[block], DATA_SIZE_C_PROJ_WEIGHT, attn_Data_c_proj_weight, -1, s, iter, block);
-            cout << "c_proj_weight: " << ptr_attn_Data_c_proj_weight[0] << " " << ptr_attn_Data_c_proj_weight[1] << endl;
+//            cout << "c_proj_weight: " << ptr_attn_Data_c_proj_weight[0] << " " << ptr_attn_Data_c_proj_weight[1] << endl;
 
             dataPrepare(ptr_attn_Data_c_proj_bias, Array_attn_Data_c_proj_bias[block], DATA_SIZE_C_PROJ_BIAS, attn_Data_c_proj_bias, -1, s, iter, block);
-            cout << "c_proj_bias: " << ptr_attn_Data_c_proj_bias[0] << " " << ptr_attn_Data_c_proj_bias[1] << endl;
+//            cout << "c_proj_bias: " << ptr_attn_Data_c_proj_bias[0] << " " << ptr_attn_Data_c_proj_bias[1] << endl;
 
             OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_attn_qkv_result, buffer_Data_attn_c_proj_weight, buffer_Data_attn_c_proj_bias, buffer_attn_out}, 0 /* 0 means from host*/));
 
@@ -581,6 +588,32 @@ int main(int argc, char* argv[]) {
             OCL_CHECK(err, err = q.enqueueTask(krnl_c_proj));
             OCL_CHECK(err, q.enqueueMigrateMemObjects({buffer_attn_out}, CL_MIGRATE_MEM_OBJECT_HOST));
             OCL_CHECK(err, q.finish());
+//            if(iter == 0 && block == 0) {
+//		        host_res_prepare(host_result, query_s*768, 16, iter);
+//		        cout << "======= CPROJ RES =======" << endl;
+//		        float max_err = abs(host_result[0] - ptr_attn_out[0]);
+//		        float maxe_host = host_result[0];
+//		        float maxe_ptr = ptr_attn_out[0];
+//		        for (int i = 0; i < 768*query_s; i++) {
+//		            if(abs(host_result[i] - ptr_attn_out[i]) > 0.001)
+//		                cout << i << " host_result: " << host_result[i] << " ptr_result: " << ptr_attn_out[i] << endl;
+//		            if(abs(host_result[i] - ptr_attn_out[i]) > max_err) {
+//		                max_err = abs(host_result[i] - ptr_attn_out[i]);
+//		                maxe_host = host_result[i];
+//		                maxe_ptr = ptr_attn_out[i];
+//		            }
+//		        }
+//		        float cnt = 0;
+//		        int cnt_0 = 0;
+//		        for (int i = 0; i<768*query_s; i++) {
+//		            if(host_result[i] != 0) cnt += abs((abs(host_result[i] - ptr_attn_out[i])/host_result[i]));
+//		            else cnt_0++;
+//		        }
+//		        cout << cnt << endl;
+//		        cnt /= (768*query_s-cnt_0);
+//		        cout << "cnt_0: " << cnt_0 << " err: " << cnt << endl;
+//		        cout << "max_err_host: " << maxe_host << " max_err_ptr: " << maxe_ptr << " diff: "  << max_err << endl;
+//		    }
 
             #ifdef ALL_MESSAGES
                 cout << "HOST-Info: Setting Kernel Vadd arguments ..." << endl;
@@ -604,10 +637,10 @@ int main(int argc, char* argv[]) {
 
 
             dataPrepare(ptr_ln_Data_g, Array_ln2_Data_g[block], LN_DATA_WIDTH, ln2_Data_g, -1, s, iter, block);
-            cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
+//            cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
 
             dataPrepare(ptr_ln_Data_b, Array_ln2_Data_b[block], LN_DATA_WIDTH, ln2_Data_b, -1, s, iter, block);
-            cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
+//            cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
 
             OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_vadd_out, buffer_Data_ln_Data_g, buffer_Data_ln_Data_b}, 0 /* 0 means from host*/));
 
@@ -632,16 +665,16 @@ int main(int argc, char* argv[]) {
             OCL_CHECK(err, q.finish());
 
             dataPrepare(ptr_mlp_w1, Array_mlp_Data_w_1[block], DATA_SIZE_MLP_WEIGHT, mlp_Data_w_1, -1, s, iter, block);
-            cout << "ptr_mlp_w1: " << ptr_mlp_w1[0] << " " << ptr_mlp_w1[1] << endl;
+//            cout << "ptr_mlp_w1: " << ptr_mlp_w1[0] << " " << ptr_mlp_w1[1] << endl;
 
             dataPrepare(ptr_mlp_b1, Array_mlp_Data_b_1[block], DATA_SIZE_MLP_BIAS_1, mlp_Data_b_1, -1, s, iter, block);
-            cout << "ptr_mlp_b1: " << ptr_mlp_b1[0] << " " << ptr_mlp_b1[1] << endl;
+//            cout << "ptr_mlp_b1: " << ptr_mlp_b1[0] << " " << ptr_mlp_b1[1] << endl;
 
             dataPrepare(ptr_mlp_w2, Array_mlp_Data_w_2[block], DATA_SIZE_MLP_WEIGHT, mlp_Data_w_2, -1, s, iter, block);
-            cout << "ptr_mlp_w2: " << ptr_mlp_w2[0] << " " << ptr_mlp_w2[1] << endl;
+//            cout << "ptr_mlp_w2: " << ptr_mlp_w2[0] << " " << ptr_mlp_w2[1] << endl;
 
             dataPrepare(ptr_mlp_b2, Array_mlp_Data_b_2[block], DATA_SIZE_MLP_BIAS_2, mlp_Data_b_2, -1, s, iter, block);
-            cout << "ptr_mlp_b2: " << ptr_mlp_b2[0] << " " << ptr_mlp_b2[1] << endl;
+//            cout << "ptr_mlp_b2: " << ptr_mlp_b2[0] << " " << ptr_mlp_b2[1] << endl;
 
             OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_Data_ln_out, buffer_mlp_w1, buffer_mlp_b1, buffer_mlp_w2, buffer_mlp_b2}, 0 /* 0 means from host*/));
 
@@ -708,10 +741,10 @@ int main(int argc, char* argv[]) {
         }
 
         dataPrepare(ptr_ln_Data_g, Array_lnf_Data_g, LN_DATA_WIDTH, lnf_Data_g, -1, s, iter, -1);
-        cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
+//        cout << "ptr_ln_Data_g: " << ptr_ln_Data_g[0] << " " << ptr_ln_Data_g[1] << endl;
 
         dataPrepare(ptr_ln_Data_b, Array_lnf_Data_b, LN_DATA_WIDTH, lnf_Data_b, -1, s, iter, -1);
-        cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
+//        cout << "ptr_ln_Data_b: " << ptr_ln_Data_b[0] << " " << ptr_ln_Data_b[1] << endl;
 
         OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_layer_out, buffer_Data_ln_Data_g, buffer_Data_ln_Data_b}, 0 /* 0 means from host*/));
         // ----------------------------------------
@@ -833,19 +866,19 @@ int main(int argc, char* argv[]) {
                             }
                             if (h == 0) {
                                 LL_RES[i * 50257 + j * N0 + d * 50257 + k] = ptr_ll_head1_res[d * N0 + k];
-                                if (abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) > 0.5) {
+//                                if (abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) > 0.5) {
                                     // cout << "i: " << i << ", j: " << j << ", k: " << k << ", kernel: " <<  ptr_ll_head1_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + j * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head1_res[d * N0 + k] - host_result_ll[i * 50257 + j * N0 + d * 50257 + k]) << endl;
                                     // ll_error_flag = 1;
                                     // break;
-                                }
+//                                }
                             }
                             else if (h == 1) {
                                 LL_RES[i * 50257 + (j + 1) * N0 + d * 50257 + k] = ptr_ll_head2_res[d * N0 + k];
-                                if (abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) > 0.5) {
+//                                if (abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) > 0.5) {
                                     // cout << "i: " << i << ", j: " << (j + 1) << ", k: " << k << ", kernel: " <<  ptr_ll_head2_res[d * N0 + k] << ", host: " << host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k] << ", err: " << abs(ptr_ll_head2_res[d * N0 + k] - host_result_ll[i * 50257 + (j + 1) * N0 + d * 50257 + k]) << endl;
                                     // ll_error_flag = 1;
                                     // break;
-                                }
+//                                }
                             }
                         }
                         // if (ll_error_flag) break;
@@ -856,10 +889,10 @@ int main(int argc, char* argv[]) {
 
         }
         double parallel_execution_time = total_execution_time_kernel1 + total_execution_time_kernel2 - total_overlap_time;
-        cout << "Total Kernel 1 execution time: " << total_execution_time_kernel1 << " ms" << endl;
-        cout << "Total Kernel 2 execution time: " << total_execution_time_kernel2 << " ms" << endl;
-        cout << "Total Overlap time: " << total_overlap_time << " ms" << endl;
-        cout << "Parallel execution time: " << parallel_execution_time << " ms" << endl;
+//        cout << "Total Kernel 1 execution time: " << total_execution_time_kernel1 << " ms" << endl;
+//        cout << "Total Kernel 2 execution time: " << total_execution_time_kernel2 << " ms" << endl;
+//        cout << "Total Overlap time: " << total_overlap_time << " ms" << endl;
+//        cout << "Parallel execution time: " << parallel_execution_time << " ms" << endl;
 
         // TODO: check result
         // cout << "=======LL_RES=======" << endl;
@@ -896,8 +929,15 @@ int main(int argc, char* argv[]) {
 
         // cout << "Array_tokenization_out: " << Array_tokenization_out[0] << " " << Array_tokenization_out[1] << " " << Array_tokenization_out[2] << endl;
         next_token = sample(sample_in, Array_tokenization_out, iter);
+//        total_sample_time += tmp_sample_time;
     }
-    Decode(Array_tokenization_out);
+    total_decode_time += Decode(Array_tokenization_out);
+    cout << "===== SW Time =====" << endl;
+    cout << "kv_cache_time: " << total_kv_time << " s" << endl;
+    cout << "decode_time: " << total_decode_time << " s" << endl;
+//    cout << "sample_time" << total_sample_time << " s" << endl;
+    cout << "wwa_time" << total_wwa_time << " s" << endl;
+    cout << "total sw time" << total_kv_time + total_decode_time + total_sample_time + total_wwa_time << " s" << endl;
     // ============================================================================
     // Step 8: Release Allocated Resources
     // ============================================================================
@@ -937,4 +977,3 @@ int main(int argc, char* argv[]) {
     cout << "HOST-Info: DONE" << endl << endl;
     return 0;
 }
-

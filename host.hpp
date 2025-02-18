@@ -59,7 +59,7 @@ ALL TIMES.
 #include <cstring>
 #include <vector>
 #include <CL/cl2.hpp>
-
+#include <time.h>
 using namespace std;
 static const int LN_DATA_DEPTH = 128;
 static const int LN_DATA_WIDTH = 768;
@@ -195,22 +195,7 @@ vector<float> host_result_ll(50257*128);
 vector<vector<float>> wte;
 vector<vector<float>> wpe;
 
-// float Array_ln_Data_in1;
-// float **Array_ln_Data_g;
-// float **Array_ln_Data_b;
-// float **Array_attn_Data_w_tiling;
-// float **Array_attn_Data_bias_tiling;
-// float **Array_attn_Data_c_proj_weight;
-// float **Array_attn_Data_c_proj_bias;
-// float **Array_mlp_Data_w_1;
-// float **Array_mlp_Data_w_2;
-// float **Array_mlp_Data_b_1;
-// float **Array_mlp_Data_b_2;
-// float **Array_ln2_Data_g;
-// float **Array_ln2_Data_b;
-// float *Array_lnf_Data_g;
-// float *Array_lnf_Data_b;
-// float *Array_last_linear_w;
+double total_kv_time, total_decode_time, total_sample_time, total_wwa_time;
 
 //Customized buffer allocation for 4K boundary alignment
 template <typename T>
@@ -230,9 +215,11 @@ struct aligned_allocator
   }
 };
 
-void upd_kv_cache(float* cur_k, float* cur_v, int block, int head, int iter) {
+double upd_kv_cache(float* cur_k, float* cur_v, int block, int head, int iter) {
     // cur接在s*64的尾巴
     // 當前head之後的都放到tmp往後移
+	double total_time = 0;
+	time_t start_upd_kv = clock();
     if (iter != 0) {
         for (int i = 0; i<11-head; i++) {
             for (int j = 0; j<s; j++) {
@@ -261,6 +248,9 @@ void upd_kv_cache(float* cur_k, float* cur_v, int block, int head, int iter) {
             v_cache[block][head*s*64 + i] = cur_v[i];
         }
     }
+	time_t end_upd_kv = clock();
+	total_time += ((double)(end_upd_kv-start_upd_kv) / CLOCKS_PER_SEC);
+    return total_time;
 
 }
 
@@ -322,27 +312,27 @@ void read_file(string path, vector<float>& Array) {
 
 void open_file() {
 
-	ifstream infile;
-	infile.open("/home/ywtang23/Data/activation/input_ids_before_embedding_iter_1.txt");
-	if(!infile.is_open()) {
-        cerr << "Error opening file input_ids_before_embedding_iter_1." << endl;
-        return;
-    }
-	std::string line;
-	int element_count = 0;
-    while (std::getline(infile, line)) {
-        element_count++;
-    }
-	Array_tokenization_out.resize(element_count);
+	// ifstream infile;
+	// infile.open("/home/ywtang23/Data/input.txt");
+	// if(!infile.is_open()) {
+    //     cerr << "Error opening file input.txt." << endl;
+    //     return;
+    // }
+	// std::string line;
+	// int element_count = 0;
+    // while (std::getline(infile, line)) {
+    //     element_count++;
+    // }
+	// Array_tokenization_out.resize(element_count);
 
-    infile.clear();
-    infile.seekg(0);
-    element_count = 0;
-    while (std::getline(infile, line)) {
-        Array_tokenization_out[element_count] = std::stof(line);
-        element_count++;
-    }
-	infile.close();
+    // infile.clear();
+    // infile.seekg(0);
+    // element_count = 0;
+    // while (std::getline(infile, line)) {
+    //     Array_tokenization_out[element_count] = std::stof(line);
+    //     element_count++;
+    // }
+	// infile.close();
 
 	for (int i = 0; i<num_block; i++) {
 		read_file("transformer.h." + to_string(i) + ".ln_1.weight.txt", Array_ln_Data_g[i]);
@@ -438,6 +428,7 @@ void dataPrepare(float *ptr, vector<float>& Array,  int Nb_Of_Elements, enum DAT
 		}
 		default: {
 			std::memcpy(ptr, Array.data(), Nb_Of_Elements * sizeof(float));
+			cout << "done" << endl;
 			break;
 		}
 	}
@@ -463,6 +454,7 @@ void host_res_prepare(vector<float>& Array, int Nb_Of_Elements, int flag, int it
 	else if(flag == 13) path = "/home/ywtang23/Data/activation/lnf_out_iter_" + to_string(iter+1) + ".txt";
 	else if(flag == 14) path = "/home/ywtang23/Data/activation/linear_output_iter_" + to_string(iter+1) + ".txt";
 	else if(flag == 15) path = "/home/ywtang23/Data/activation/qkv_iter_" + to_string(iter+1) + "_block_1.txt";
+	else if(flag == 16) path = "/home/ywtang23/Data/activation/cproj_out_iter_" + to_string(iter+1) + "_block_1.txt";
 	infile.open(path);
 
 	std::string line;
