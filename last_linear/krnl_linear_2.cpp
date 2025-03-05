@@ -77,9 +77,9 @@ mem_wr:
 
 extern "C" {
 void krnl_linear_2(float* x, float* w, float* out, int depth) {
-#pragma HLS INTERFACE m_axi port=x offset=slave bundle=gmem0 depth=4096 max_read_burst_length=256
-#pragma HLS INTERFACE m_axi port=w offset=slave bundle=gmem1 depth=4096 max_read_burst_length=256
-#pragma HLS INTERFACE m_axi port=out offset=slave bundle=gmem2 depth=4096 max_read_burst_length=256
+#pragma HLS INTERFACE m_axi port=x offset=slave bundle=gmem2 depth=4096 max_read_burst_length=256
+#pragma HLS INTERFACE m_axi port=w offset=slave bundle=gmem16 depth=4096 max_read_burst_length=256
+#pragma HLS INTERFACE m_axi port=out offset=slave bundle=gmem3 depth=4096 max_read_burst_length=256
 #pragma HLS INTERFACE s_axilite port=x bundle=control
 #pragma HLS INTERFACE s_axilite port=w bundle=control
 #pragma HLS INTERFACE s_axilite port=out bundle=control
