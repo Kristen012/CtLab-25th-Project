@@ -7,6 +7,8 @@
 #include <locale>
 #include <codecvt>
 #include <algorithm>
+#include <time.h>
+
 using namespace std;
 void print_b2u_mapping(const std::unordered_map < uint8_t, wchar_t > & b2u) {
     for (const auto & pair: b2u) {
@@ -192,11 +194,13 @@ std::string decode(const std::vector < int > & ids,
     return r;
 }
 
-void Decode(std::vector<int> indices) {
+double Decode(std::vector<int> indices) {
     // Load vocab.json and create the decoder
     std::unordered_map < std::string, int > t2i;
     std::unordered_map < int, std::string > i2t;
     std::fstream vocab_txt("/home/ywtang23/Data/weight/vocab.txt", std::ios::in);
+    double total_time = 0;
+    time_t start_time = clock();
     load_vocab(vocab_txt, & t2i, & i2t);
     // cout << i2t.size() << "  "<< t2i.size() << endl;
     std::unordered_map < uint8_t, wchar_t > b2u;
@@ -225,6 +229,8 @@ void Decode(std::vector<int> indices) {
     // for(auto x: indices)
     //     printf("%d\n",x);
     // // Output the result
+    time_t end_time = clock();
+    total_time += ((double)(end_time-start_time) / CLOCKS_PER_SEC);
     std::cout << "===== Decoded Result =====" << endl;
     std::string decoded_result = decode(indices, u2b, i2t);
     std::cout << decoded_result << std::endl;
@@ -237,5 +243,5 @@ void Decode(std::vector<int> indices) {
         std::cerr << "Failed to open the file for writing" << std::endl;
     }
 
-    return;
+    return total_time;
 }

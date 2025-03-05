@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <iomanip>
+#include <time.h>
 
 // Function to load 1D weights from a txt file and reshape them into 2D
 // std::vector<float> load1DWeights(const std::string& filePath) {
@@ -52,12 +53,12 @@ void saveToTXT(const std::vector<std::vector<float>>& data, const std::string& f
     }
 }
 
-std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_input, 
-                                             const std::vector<std::vector<float>>& wte, 
+std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_input,
+                                             const std::vector<std::vector<float>>& wte,
                                              const std::vector<std::vector<float>>& wpe,int index) {
     int embedding_size = wte[0].size();
     int sequence_length = tokenized_input.size();
-    
+
     std::vector<std::vector<float>> result(sequence_length, std::vector<float>(embedding_size, 0.0f));
 
     for (int i = 0; i < sequence_length; ++i) {
@@ -66,7 +67,7 @@ std::vector<std::vector<float>> sumWPEAndWTE(const std::vector<int>& tokenized_i
             result[i][j] = wte[token_id][j] + wpe[index+i][j];
         }
     }
-    
+
     return result;
 }
 
@@ -109,12 +110,14 @@ void saveToTXT(const std::vector<std::vector<float>>& data, std::vector<float>& 
         // std::cerr << "Unable to open file " << filePath << std::endl;
     // }
 }
-void WPE_WTE_add(std::vector<int>& input_vec, std::vector<float>& Array_ln_Data_in1, int index) {
+double WPE_WTE_add(std::vector<int>& input_vec, std::vector<float>& Array_ln_Data_in1, int index) {
 
+    double total_time = 0;
+    time_t start_time = clock();
     Array_ln_Data_in1.clear();
-    for (int i = 0; i<input_vec.size(); i++) {
-        std::cout << input_vec[i] << std::endl;
-    }
+//    for (int i = 0; i<input_vec.size(); i++) {
+//        std::cout << i << ": " << input_vec[i] << std::endl;
+//    }
 
     int embedding_size = 768;
     int num_wte_tokens = 50257;
@@ -140,17 +143,19 @@ void WPE_WTE_add(std::vector<int>& input_vec, std::vector<float>& Array_ln_Data_
 
         // Perform the sum operation between WTE and WPE
         // printf("index : %d\n",index);
-        std::vector<std::vector<float>> result = sumWPEAndWTE(input_vec, wte, wpe,index);
+    std::vector<std::vector<float>> result = sumWPEAndWTE(input_vec, wte, wpe,index);
 
-        index+=(int)result.size();
+    index+=(int)result.size();
         // Generate output file name based on input file
         // std::string output_file = input_file.substr(input_file.find_last_of("\\") + 1);
         // output_file = "output_" + output_file; // Example: output_iter_1.txt
 
         // Save the result to output file
-        saveToTXT(result, Array_ln_Data_in1);
+    saveToTXT(result, Array_ln_Data_in1);
+    time_t end_time = clock();
+    total_time += ((double)(end_time-start_time) / CLOCKS_PER_SEC);
     // }
-
-    return;
+//    cout << "Done WPE WTE ADD" << endl;
+    return total_time;
 
 }
