@@ -211,15 +211,15 @@ void krnl_attn(float* x, float* w_tiling_q, float* w_tiling_k, float* w_tiling_v
                 float* bias_tiling_q, float* bias_tiling_k, float* bias_tiling_v,
                 float* k_tiling, float* v_tiling,
                 int s, int iter, int host_wi, float* out, float* cur_k, float* cur_v) {
-#pragma HLS INTERFACE m_axi port = x offset = slave bundle = gmem0 max_read_burst_length = 256
-#pragma HLS INTERFACE m_axi port = w_tiling_q offset = slave bundle = gmem1 depth = DATA_SIZE_ATTN_WEIGHT_TILED
-#pragma HLS INTERFACE m_axi port = w_tiling_k offset = slave bundle = gmem2 depth = DATA_SIZE_ATTN_WEIGHT_TILED
-#pragma HLS INTERFACE m_axi port = w_tiling_v offset = slave bundle = gmem3 depth = DATA_SIZE_ATTN_WEIGHT_TILED
-#pragma HLS INTERFACE m_axi port = bias_tiling_q offset = slave bundle = gmem4 depth = DATA_SIZE_ATTN_BIAS_TILED
-#pragma HLS INTERFACE m_axi port = bias_tiling_k offset = slave bundle = gmem4 depth = DATA_SIZE_ATTN_BIAS_TILED
-#pragma HLS INTERFACE m_axi port = bias_tiling_v offset = slave bundle = gmem4 depth = DATA_SIZE_ATTN_BIAS_TILED
-#pragma HLS INTERFACE m_axi port = k_tiling offset = slave bundle = gmem5 depth = K_V_MAX // inout
-#pragma HLS INTERFACE m_axi port = v_tiling offset = slave bundle = gmem6 depth = K_V_MAX // inout
+#pragma HLS INTERFACE m_axi port = x offset = slave bundle = gmem6 max_read_burst_length = 256
+#pragma HLS INTERFACE m_axi port = w_tiling_q offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_WEIGHT_TILED
+#pragma HLS INTERFACE m_axi port = w_tiling_k offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_WEIGHT_TILED
+#pragma HLS INTERFACE m_axi port = w_tiling_v offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_WEIGHT_TILED
+#pragma HLS INTERFACE m_axi port = bias_tiling_q offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_BIAS_TILED
+#pragma HLS INTERFACE m_axi port = bias_tiling_k offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_BIAS_TILED
+#pragma HLS INTERFACE m_axi port = bias_tiling_v offset = slave bundle = gmem7 depth = DATA_SIZE_ATTN_BIAS_TILED
+#pragma HLS INTERFACE m_axi port = k_tiling offset = slave bundle = gmem8 depth = K_V_MAX // inout
+#pragma HLS INTERFACE m_axi port = v_tiling offset = slave bundle = gmem8 depth = K_V_MAX // inout
 #pragma HLS INTERFACE m_axi port = out offset = slave bundle = gmem9 // inout
 
 

@@ -52,7 +52,7 @@ compute_c_proj:
     for (int k = 0; k<NUM_HEAD; k++) {
         for (int i = 0; i<s; i++) {
             for (int m = 0; m<HEAD_DIM; m++) {
-                
+
                 for (int j = 0; j<EMB; j++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL skip_exit_check factor=8
@@ -81,10 +81,10 @@ mem_wr:
 extern "C" {
 
 void krnl_c_proj(float* qkv_res, float* c_proj_weight, float* c_proj_bias, int s, float* out) {
-#pragma HLS INTERFACE m_axi port = qkv_res offset = slave bundle = gmem0 max_read_burst_length = 256
-#pragma HLS INTERFACE m_axi port = c_proj_weight offset = slave bundle = gmem1 depth = DATA_SIZE_PROJ_WEIGHT // inout
-#pragma HLS INTERFACE m_axi port = c_proj_bias offset = slave bundle = gmem2 depth = DATA_SIZE_PROJ_BIAS // inout
-#pragma HLS INTERFACE m_axi port = out offset = slave bundle = gmem3
+#pragma HLS INTERFACE m_axi port = qkv_res offset = slave bundle = gmem4 max_read_burst_length = 256
+#pragma HLS INTERFACE m_axi port = c_proj_weight offset = slave bundle = gmem17 depth = DATA_SIZE_PROJ_WEIGHT // inout
+#pragma HLS INTERFACE m_axi port = c_proj_bias offset = slave bundle = gmem18 depth = DATA_SIZE_PROJ_BIAS // inout
+#pragma HLS INTERFACE m_axi port = out offset = slave bundle = gmem5
 
 
     float qkv_res_buf[X_SIZE];
